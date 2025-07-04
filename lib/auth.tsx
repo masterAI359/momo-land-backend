@@ -40,27 +40,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
-    const response = await api.post("/auth/login", { email, password })
-    const newUser = response.data.user
+    try {
+      const response = await api.post("/auth/login", { email, password })
+      const newUser = response.data.user
+      localStorage.setItem("token", response.data.token)
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
+      setUser(newUser)
 
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
-    setUser(newUser)
-
-    return { success: true, user: newUser }
+      return { success: true, user: newUser }
+    } catch (error: any) {
+      console.error("Login error:", error)
+      return { 
+        success: false, 
+        error: error.response?.data?.error || error.message || "Network error occurred" 
+      }
+    }
   }
 
   const register = async (nickname: string, email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
-    const response = await api.post("/auth/register", { nickname, email, password })
-    const newUser = response.data.user
-
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
-    setUser(newUser)
-
-    return { success: true, user: newUser }
+    try {
+      console.log("nickname =================", nickname)
+      console.log("email =================", email)
+      console.log("password =================", password)
+      const response = await api.post("/auth/register", { nickname, email, password })
+      
+      if (response.data.user) {
+        const newUser = response.data.user
+        localStorage.setItem("token", response.data.token)
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
+        setUser(newUser)
+        return { success: true, user: newUser }
+      }
+      return { success: false, error: response.data.error || "Registration failed" }
+    } catch (error: any) {
+      console.error("Registration error:", error)
+      return { 
+        success: false, 
+        error: error.response?.data?.error || error.message || "Network error occurred" 
+      }
+    }
   }
 
   const logout = () => {
     localStorage.removeItem(CURRENT_USER_KEY)
+    localStorage.removeItem("token")
     setUser(null)
   }
 

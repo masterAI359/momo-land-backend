@@ -18,7 +18,8 @@ const app = express()
 const server = createServer(app)
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    // origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: "*",
     methods: ["GET", "POST"],
   },
 })
@@ -27,7 +28,8 @@ const io = new Server(server, {
 app.use(helmet())
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    // origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: "*",
     credentials: true,
   }),
 )

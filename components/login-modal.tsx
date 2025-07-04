@@ -37,12 +37,12 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
     e.preventDefault();
     setError("");
 
-    if (!nickname.trim() || !email.trim()) {
+    if (isRegister && !nickname.trim()) {
       setError("ニックネームとメールアドレスを入力してください。");
       return;
     }
 
-    if (nickname.length < 2) {
+    if (isRegister && nickname.length < 2) {
       setError("ニックネームは2文字以上で入力してください。");
       return;
     }

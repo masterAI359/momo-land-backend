@@ -1,187 +1,249 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Heart, MessageSquare, Clock, User } from "lucide-react"
+import { Heart, MessageSquare, Clock, User, Eye, ArrowLeft } from "lucide-react"
 import AffiliateBanner from "@/components/affiliate-banner"
+import Link from "next/link"
+import api from "@/api/axios"
+import { useAuth } from "@/lib/auth"
+import { useToast } from "@/hooks/use-toast"
+
+interface Post {
+  id: string
+  title: string
+  content: string
+  category: string
+  excerpt: string
+  author: {
+    id: string
+    nickname: string
+  }
+  likesCount: number
+  commentsCount: number
+  viewCount: number
+  isLiked?: boolean
+  createdAt: string
+  updatedAt: string
+  comments?: Comment[]
+}
+
+interface Comment {
+  id: string
+  content: string
+  author: {
+    id: string
+    nickname: string
+  }
+  createdAt: string
+}
 
 export const metadata = {
   title: "ブログ詳細 - momoLand",
   description: "ライブチャット体験記の詳細ページ",
 }
 
-export default function BlogDetailPage({ params }: { params: { id: string } }) {
-  const blogId = params.id
+export default function BlogPostPage() {
+  const params = useParams()
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const [post, setPost] = useState<Post | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [liking, setLiking] = useState(false)
 
-  // サンプルデータ
-  const blog = {
-    id: blogId,
-    title: `ライブチャット体験記 ${blogId}`,
-    author: `ユーザー${blogId}`,
-    content: `
-      こんにちは、${`ユーザー${blogId}`}です。今回は私のライブチャット体験について詳しくお話ししたいと思います。
-
-      ## 初めてのライブチャット体験
-
-      最初は緊張していましたが、チャットレディの方がとても親切で、すぐにリラックスできました。
-      会話も弾み、とても楽しい時間を過ごすことができました。
-
-      ## 印象に残ったポイント
-
-      1. **コミュニケーションの質**: チャットレディの方の対応が素晴らしく、自然な会話ができました。
-      2. **サイトの使いやすさ**: インターフェースが分かりやすく、初心者でも簡単に利用できました。
-      3. **料金体系**: 明確な料金設定で、安心して利用できました。
-
-      ## 今後の利用について
-
-      今回の体験がとても良かったので、また利用したいと思います。
-      同じような体験を求めている方にもおすすめしたいです。
-
-      皆さんも良いライブチャット体験ができることを願っています！
-    `,
-    likes: 25,
-    comments: 8,
-    createdAt: "3時間前",
-    category: "おすすめ",
+  const fetchPost = async () => {
+    try {
+      setLoading(true)
+      const response = await api.get(`/posts/${params.id}`)
+      setPost(response.data)
+      setError(null)
+    } catch (error: any) {
+      console.error("Failed to fetch post:", error)
+      setError("投稿の取得に失敗しました。")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const comments = [
-    {
-      id: 1,
-      author: "コメントユーザー1",
-      content: "とても参考になる体験記でした！私も同じサイトを利用してみたいと思います。",
-      createdAt: "2時間前",
-    },
-    {
-      id: 2,
-      author: "コメントユーザー2",
-      content: "詳しいレビューありがとうございます。料金体系について教えていただけませんか？",
-      createdAt: "1時間前",
-    },
-  ]
+  const handleLike = async () => {
+    if (!user) {
+      toast({
+        title: "ログインが必要です",
+        description: "いいねするにはログインしてください。",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      setLiking(true)
+      await api.post(`/posts/${params.id}/like`)
+      
+      // Update the post state
+      setPost(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          isLiked: !prev.isLiked,
+          likesCount: prev.isLiked ? prev.likesCount - 1 : prev.likesCount + 1
+        }
+      })
+
+      toast({
+        title: post?.isLiked ? "いいねを取り消しました" : "いいねしました",
+        description: "ありがとうございます！",
+      })
+    } catch (error: any) {
+      console.error("Failed to like post:", error)
+      toast({
+        title: "エラー",
+        description: "いいねの処理に失敗しました。",
+        variant: "destructive",
+      })
+    } finally {
+      setLiking(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  useEffect(() => {
+    if (params.id) {
+      fetchPost()
+    }
+  }, [params.id])
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">投稿を読み込み中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !post) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center">
+          <p className="text-red-600">{error || "投稿が見つかりませんでした。"}</p>
+          <div className="mt-4 space-x-4">
+            <Button onClick={fetchPost}>再試行</Button>
+            <Link href="/blogs">
+              <Button variant="outline">ブログ一覧に戻る</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="space-y-8">
-        {/* Blog Header */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm bg-pink-100 text-pink-800 px-3 py-1 rounded-full">{blog.category}</span>
-              <span className="text-sm text-gray-500 flex items-center">
-                <Clock className="w-4 h-4 mr-1" />
-                {blog.createdAt}
-              </span>
-            </div>
-            <CardTitle className="text-2xl md:text-3xl">{blog.title}</CardTitle>
-            <CardDescription className="flex items-center space-x-4">
-              <span className="flex items-center">
-                <User className="w-4 h-4 mr-1" />
-                投稿者: {blog.author}
-              </span>
-              <span className="flex items-center">
-                <Heart className="w-4 h-4 mr-1 text-red-500" />
-                {blog.likes} いいね
-              </span>
-              <span className="flex items-center">
-                <MessageSquare className="w-4 h-4 mr-1 text-blue-500" />
-                {blog.comments} コメント
-              </span>
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        <AffiliateBanner size="large" position="content" />
-
-        {/* Blog Content */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="prose max-w-none">
-              {blog.content.split("\n").map((paragraph, index) => {
-                if (paragraph.startsWith("## ")) {
-                  return (
-                    <h2 key={index} className="text-xl font-bold mt-6 mb-4 text-gray-900">
-                      {paragraph.replace("## ", "")}
-                    </h2>
-                  )
-                } else if (paragraph.startsWith("1. ") || paragraph.startsWith("2. ") || paragraph.startsWith("3. ")) {
-                  return (
-                    <div key={index} className="mb-2">
-                      <p className="text-gray-700">{paragraph}</p>
-                    </div>
-                  )
-                } else if (paragraph.trim()) {
-                  return (
-                    <p key={index} className="mb-4 text-gray-700 leading-relaxed">
-                      {paragraph}
-                    </p>
-                  )
-                }
-                return null
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Like Button */}
-        <div className="text-center">
-          <Button size="lg" className="bg-pink-600 hover:bg-pink-700">
-            <Heart className="w-5 h-5 mr-2" />
-            いいね ({blog.likes})
+      {/* Back Button */}
+      <div className="mb-6">
+        <Link href="/blogs">
+          <Button variant="ghost" className="text-pink-600 hover:text-pink-700">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            ブログ一覧に戻る
           </Button>
-        </div>
+        </Link>
+      </div>
 
-        <AffiliateBanner size="medium" position="content" />
+      {/* Post Content */}
+      <Card className="mb-8">
+        <CardHeader>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm bg-pink-100 text-pink-800 px-3 py-1 rounded-full">
+              {post.category}
+            </span>
+            <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <span className="flex items-center">
+                <Eye className="w-4 h-4 mr-1" />
+                {post.viewCount}
+              </span>
+              <span className="flex items-center">
+                <Clock className="w-4 h-4 mr-1" />
+                {formatDate(post.createdAt)}
+              </span>
+            </div>
+          </div>
+          <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+            {post.title}
+          </CardTitle>
+          <CardDescription className="text-base">
+            投稿者: {post.author.nickname}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="prose max-w-none mb-6">
+            <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+              {post.content}
+            </div>
+          </div>
+          
+          {/* Actions */}
+          <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+            <div className="flex items-center space-x-6">
+              <Button
+                variant="ghost"
+                onClick={handleLike}
+                disabled={liking}
+                className={`flex items-center space-x-2 ${
+                  post.isLiked ? "text-red-600" : "text-gray-600"
+                }`}
+              >
+                <Heart className={`w-5 h-5 ${post.isLiked ? "fill-current" : ""}`} />
+                <span>{post.likesCount}</span>
+              </Button>
+              <div className="flex items-center space-x-2 text-gray-600">
+                <MessageSquare className="w-5 h-5" />
+                <span>{post.commentsCount}</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Comments Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <MessageSquare className="w-5 h-5 mr-2" />
-              コメント ({blog.comments})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Existing Comments */}
+      {/* Comments Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl">コメント ({post.commentsCount})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {post.comments && post.comments.length > 0 ? (
             <div className="space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="border-l-4 border-pink-200 pl-4 py-2">
+              {post.comments.map((comment) => (
+                <div key={comment.id} className="border-b border-gray-100 pb-4 last:border-b-0">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900">{comment.author}</span>
-                    <span className="text-sm text-gray-500">{comment.createdAt}</span>
+                    <span className="font-medium text-gray-900">{comment.author.nickname}</span>
+                    <span className="text-sm text-gray-500">{formatDate(comment.createdAt)}</span>
                   </div>
                   <p className="text-gray-700">{comment.content}</p>
                 </div>
               ))}
             </div>
-
-            {/* Comment Form */}
-            <div className="border-t pt-6">
-              <h3 className="font-medium mb-4">コメントを投稿</h3>
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="comment-author" className="block text-sm font-medium text-gray-700 mb-2">
-                    ニックネーム
-                  </label>
-                  <Input id="comment-author" placeholder="あなたのニックネーム" className="w-full" />
-                </div>
-                <div>
-                  <label htmlFor="comment-content" className="block text-sm font-medium text-gray-700 mb-2">
-                    コメント
-                  </label>
-                  <Textarea
-                    id="comment-content"
-                    placeholder="コメントを入力してください..."
-                    rows={4}
-                    className="w-full"
-                  />
-                </div>
-                <Button className="bg-pink-600 hover:bg-pink-700">コメントを投稿</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">まだコメントがありません。</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

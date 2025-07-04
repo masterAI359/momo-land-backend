@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import LoginModal from "@/components/login-modal"
+import api from "@/api/axios"
 
 export default function PostPage() {
   const [title, setTitle] = useState("")
@@ -45,34 +46,37 @@ export default function PostPage() {
 
     setIsSubmitting(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      const response = await api.post("/posts", {
+        title: title.trim(),
+        content: content.trim(),
+        category,
+      })
 
-    // Save post to localStorage (in real app, this would be sent to backend)
-    const posts = JSON.parse(localStorage.getItem("momo_land_posts") || "[]")
-    const newPost = {
-      id: Date.now().toString(),
-      title: title.trim(),
-      content: content.trim(),
-      category,
-      author: user.nickname,
-      authorId: user.id,
-      likes: 0,
-      comments: 0,
-      createdAt: new Date().toISOString(),
+      console.log("response =================", response)
+      
+      toast({
+        title: "投稿完了",
+        description: "体験記が正常に投稿されました！",
+      })
+
+      // Clear form after successful submission
+      setTitle("")
+      setContent("")
+      setCategory("初心者向け")
+      
+      // Optionally redirect to the new post
+      // router.push(`/blogs/${response.data.post.id}`)
+    } catch (error: any) {
+      console.error("Post creation error:", error)
+      toast({
+        title: "投稿エラー",
+        description: error.response?.data?.error || "投稿に失敗しました。もう一度お試しください。",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
-
-    posts.unshift(newPost)
-    localStorage.setItem("momo_land_posts", JSON.stringify(posts))
-
-    setIsSubmitting(false)
-
-    toast({
-      title: "投稿完了",
-      description: "体験記が正常に投稿されました！",
-    })
-
-    router.push(`/blogs/${newPost.id}`)
   }
 
   if (!user) {
