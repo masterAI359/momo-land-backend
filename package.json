@@ -5,6 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev",
+    "server": "nodemon src/server.js",
     "lint": "next lint",
     "start": "next start",
     "db:generate": "prisma generate",
