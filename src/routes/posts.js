@@ -2,6 +2,7 @@ const express = require("express")
 const { body, validationResult, query } = require("express-validator")
 const prisma = require("../config/database")
 const { authenticateToken, optionalAuth } = require("../middleware/auth")
+const { emitToRoom } = require("../socket/socketService")
 
 const router = express.Router()
 
@@ -264,14 +265,19 @@ router.post(
         },
       })
 
+      const postData = {
+        ...post,
+        likesCount: post._count.likes,
+        commentsCount: post._count.comments,
+        _count: undefined,
+      }
+
+      // Emit real-time event for new post
+      emitToRoom("blog-room", "new-post", postData)
+
       res.status(201).json({
         message: "Post created successfully",
-        post: {
-          ...post,
-          likesCount: post._count.likes,
-          commentsCount: post._count.comments,
-          _count: undefined,
-        },
+        post: postData,
       })
     } catch (error) {
       console.error("Create post error:", error)
@@ -315,6 +321,15 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
         },
       })
 
+      // Get updated like count
+      const likesCount = await prisma.like.count({
+        where: { postId: id },
+      })
+
+      // Emit real-time event for unlike
+      emitToRoom("blog-room", "post-liked", { postId: id, likesCount, isLiked: false })
+      emitToRoom(`post-${id}`, "post-liked", { postId: id, likesCount, isLiked: false })
+
       res.json({ message: "Post unliked", isLiked: false })
     } else {
       // Like
@@ -324,6 +339,15 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
           userId: req.user.id,
         },
       })
+
+      // Get updated like count
+      const likesCount = await prisma.like.count({
+        where: { postId: id },
+      })
+
+      // Emit real-time event for like
+      emitToRoom("blog-room", "post-liked", { postId: id, likesCount, isLiked: true })
+      emitToRoom(`post-${id}`, "post-liked", { postId: id, likesCount, isLiked: true })
 
       res.json({ message: "Post liked", isLiked: true })
     }
@@ -375,6 +399,10 @@ router.post(
           },
         },
       })
+
+      // Emit real-time event for new comment
+      emitToRoom("blog-room", "new-comment", comment)
+      emitToRoom(`post-${id}`, "new-comment", comment)
 
       res.status(201).json({
         message: "Comment added successfully",

@@ -1,6 +1,7 @@
 "use client"
 
 import api from "@/api/axios"
+import socketService from "@/lib/socket"
 import React from "react"
 import { useState, useEffect, createContext, useContext } from "react"
 
@@ -33,8 +34,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Load current user from localStorage
     const savedUser = localStorage.getItem(CURRENT_USER_KEY)
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    const token = localStorage.getItem("token")
+    
+    if (savedUser && token) {
+      const userData = JSON.parse(savedUser)
+      setUser(userData)
+      // Connect to WebSocket with token
+      console.log("🔗 Connecting to WebSocket from auth context")
+      socketService.connect(token)
     }
     setIsLoading(false)
   }, [])
@@ -43,9 +50,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await api.post("/auth/login", { email, password })
       const newUser = response.data.user
-      localStorage.setItem("token", response.data.token)
+      const token = response.data.token
+      localStorage.setItem("token", token)
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
       setUser(newUser)
+      
+      // Connect to WebSocket after login
+      console.log("🔗 Connecting to WebSocket after login")
+      socketService.connect(token)
 
       return { success: true, user: newUser }
     } catch (error: any) {
@@ -66,9 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (response.data.user) {
         const newUser = response.data.user
-        localStorage.setItem("token", response.data.token)
+        const token = response.data.token
+        localStorage.setItem("token", token)
         localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
         setUser(newUser)
+        
+        // Connect to WebSocket after registration
+        console.log("🔗 Connecting to WebSocket after registration")
+        socketService.connect(token)
+        
         return { success: true, user: newUser }
       }
       return { success: false, error: response.data.error || "Registration failed" }
@@ -85,6 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(CURRENT_USER_KEY)
     localStorage.removeItem("token")
     setUser(null)
+    
+    // Disconnect from WebSocket on logout
+    socketService.disconnect()
   }
 
   return <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>{children}</AuthContext.Provider>

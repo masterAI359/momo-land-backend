@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Heart, Clock } from "lucide-react"
+import { MessageSquare, Heart, Clock, Wifi, WifiOff } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
 import api from "@/api/axios"
+import socketService from "@/lib/socket"
+import { useAuth } from "@/lib/auth"
+import { useToast } from "@/hooks/use-toast"
 
 interface Post {
   id: string
@@ -46,6 +49,9 @@ export default function BlogsPage() {
     total: 0,
     pages: 1
   })
+  const [isConnected, setIsConnected] = useState(false)
+  const { user } = useAuth()
+  const { toast } = useToast()
 
   const fetchPosts = async (page: number = 1) => {
     try {
@@ -68,6 +74,68 @@ export default function BlogsPage() {
   useEffect(() => {
     fetchPosts(1)
   }, [])
+
+  // Real-time WebSocket setup
+  useEffect(() => {
+    if (user) {
+      console.log("🔗 Setting up WebSocket for blogs page")
+      // Check connection status
+      setIsConnected(socketService.isConnectedToServer())
+      console.log("📡 WebSocket connected:", socketService.isConnectedToServer())
+      
+      // Join blog room for real-time updates
+      socketService.joinBlogRoom()
+
+      // Set up real-time event listeners
+      const handleNewPost = (newPost: Post) => {
+        setPosts(prevPosts => [newPost, ...prevPosts.slice(0, 9)]) // Keep only 10 posts
+        setPagination(prev => ({ ...prev, total: prev.total + 1 }))
+        
+        toast({
+          title: "新しい投稿",
+          description: `${newPost.author.nickname}さんが新しい投稿をしました: ${newPost.title}`,
+        })
+      }
+
+      const handlePostLike = (data: { postId: string; likesCount: number; isLiked: boolean }) => {
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === data.postId 
+              ? { ...post, likesCount: data.likesCount }
+              : post
+          )
+        )
+      }
+
+      const handleNewComment = (comment: any) => {
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === comment.postId 
+              ? { ...post, commentsCount: post.commentsCount + 1 }
+              : post
+          )
+        )
+      }
+
+      socketService.onNewPost(handleNewPost)
+      socketService.onPostLike(handlePostLike)
+      socketService.onNewComment(handleNewComment)
+
+      // Update connection status
+      const checkConnection = () => {
+        setIsConnected(socketService.isConnectedToServer())
+      }
+      const connectionInterval = setInterval(checkConnection, 5000)
+
+      return () => {
+        socketService.leaveBlogRoom()
+        socketService.offNewPost(handleNewPost)
+        socketService.offPostLike(handlePostLike)
+        socketService.offNewComment(handleNewComment)
+        clearInterval(connectionInterval)
+      }
+    }
+  }, [user, toast])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -117,10 +185,28 @@ export default function BlogsPage() {
         {/* Main Content */}
         <div className="flex-1">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">ブログ一覧</h1>
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-3xl font-bold text-gray-900">ブログ一覧</h1>
+              {user && (
+                <div className="flex items-center space-x-2">
+                  {isConnected ? (
+                    <div className="flex items-center text-green-600">
+                      <Wifi className="w-4 h-4 mr-1" />
+                      <span className="text-sm">リアルタイム接続中</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-red-600">
+                      <WifiOff className="w-4 h-4 mr-1" />
+                      <span className="text-sm">接続なし</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
             <p className="text-gray-600">
               ユーザーが投稿したライブチャット体験記を一覧で確認できます。
               気になる投稿をクリックして詳細をチェックしてみましょう。
+              {user && " リアルタイムで新しい投稿や更新を受け取ります。"}
             </p>
           </div>
 

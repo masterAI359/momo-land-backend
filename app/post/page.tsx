@@ -2,18 +2,19 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PenTool, Save, Eye, AlertCircle } from "lucide-react"
+import { PenTool, Save, Eye, AlertCircle, Wifi, WifiOff } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import LoginModal from "@/components/login-modal"
 import api from "@/api/axios"
+import socketService from "@/lib/socket"
 
 export default function PostPage() {
   const [title, setTitle] = useState("")
@@ -21,11 +22,24 @@ export default function PostPage() {
   const [category, setCategory] = useState("初心者向け")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
 
   const categories = ["初心者向け", "上級者向け", "おすすめ", "レビュー"]
+
+  // Check WebSocket connection status
+  useEffect(() => {
+    if (user) {
+      setIsConnected(socketService.isConnectedToServer())
+      const checkConnection = () => {
+        setIsConnected(socketService.isConnectedToServer())
+      }
+      const connectionInterval = setInterval(checkConnection, 5000)
+      return () => clearInterval(connectionInterval)
+    }
+  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,9 +126,22 @@ export default function PostPage() {
         {/* Post Form */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <PenTool className="w-5 h-5 text-pink-600" />
-              <span>新しい体験記を作成</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <PenTool className="w-5 h-5 text-pink-600" />
+                <span>新しい体験記を作成</span>
+              </div>
+              {isConnected ? (
+                <div className="flex items-center text-green-600">
+                  <Wifi className="w-4 h-4 mr-1" />
+                  <span className="text-sm">リアルタイム投稿</span>
+                </div>
+              ) : (
+                <div className="flex items-center text-red-600">
+                  <WifiOff className="w-4 h-4 mr-1" />
+                  <span className="text-sm">接続なし</span>
+                </div>
+              )}
             </CardTitle>
             <CardDescription>投稿者: {user.nickname} として投稿されます</CardDescription>
           </CardHeader>
