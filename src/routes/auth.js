@@ -26,7 +26,6 @@ router.post(
       }
 
       const { nickname, email, password } = req.body
-
       // Check if user already exists
       const existingUser = await prisma.user.findFirst({
         where: {
@@ -51,6 +50,7 @@ router.post(
       let hashedPassword = null
       if (password) {
         hashedPassword = await bcrypt.hash(password, 10)
+        console.log("hashedPassword =================", hashedPassword)
       }
 
       // Create user
@@ -60,11 +60,14 @@ router.post(
           email,
           password: hashedPassword,
           isGuest: !password,
+          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=user2",
         },
         select: {
           id: true,
           nickname: true,
           email: true,
+          password: true,
+          avatar: true,
           isGuest: true,
           createdAt: true,
         },
@@ -130,6 +133,7 @@ router.post("/login", [body("email").isEmail().normalizeEmail(), body("password"
         id: user.id,
         nickname: user.nickname,
         email: user.email,
+        avatar: user.avatar,
         isGuest: user.isGuest,
         createdAt: user.createdAt,
       },

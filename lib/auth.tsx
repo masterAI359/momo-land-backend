@@ -1,26 +1,29 @@
 "use client"
 
+import api from "@/api/axios"
 import React from "react"
 import { useState, useEffect, createContext, useContext } from "react"
 
 interface User {
   id: string
-  nickname: string
   email: string
-  registeredAt: Date
+  avatar: string
+  nickname: string
+  password: string
+  isGuest: boolean
+  createdAt: Date
 }
 
 interface AuthContextType {
   user: User | null
-  login: (nickname: string, email: string) => Promise<{ success: boolean; error?: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>
+  register: (nickname: string, email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>
   logout: () => void
   isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Simulated user database
-const USERS_KEY = "momo_land_users"
 const CURRENT_USER_KEY = "momo_land_current_user"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -36,34 +39,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  const login = async (nickname: string, email: string): Promise<{ success: boolean; error?: string }> => {
-    // Get existing users
-    const existingUsers = JSON.parse(localStorage.getItem(USERS_KEY) || "[]")
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
+    const response = await api.post("/auth/login", { email, password })
+    const newUser = response.data.user
 
-    // Check if nickname already exists
-    const nicknameExists = existingUsers.some((u: User) => u.nickname.toLowerCase() === nickname.toLowerCase())
-
-    if (nicknameExists) {
-      return { success: false, error: "このニックネームは既に使用されています。別のニックネームを選択してください。" }
-    }
-
-    // Create new user
-    const newUser: User = {
-      id: Date.now().toString(),
-      nickname,
-      email,
-      registeredAt: new Date(),
-    }
-
-    // Save to users list
-    existingUsers.push(newUser)
-    localStorage.setItem(USERS_KEY, JSON.stringify(existingUsers))
-
-    // Set as current user
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
     setUser(newUser)
 
-    return { success: true }
+    return { success: true, user: newUser }
+  }
+
+  const register = async (nickname: string, email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> => {
+    const response = await api.post("/auth/register", { nickname, email, password })
+    const newUser = response.data.user
+
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser))
+    setUser(newUser)
+
+    return { success: true, user: newUser }
   }
 
   const logout = () => {
@@ -71,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

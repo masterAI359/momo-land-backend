@@ -98,7 +98,7 @@ export default function HomePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              {/* <div>
                 <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-2">
                   ニックネーム
                 </label>
@@ -109,7 +109,7 @@ export default function HomePage() {
                   連絡用メールアドレス
                 </label>
                 <Input id="email" type="email" placeholder="example@email.com" className="w-full" />
-              </div>
+              </div> */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <FeatureCard
                   icon={<MessageSquare className="w-4 h-4 mr-2" />}
