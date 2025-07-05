@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Users, Plus, MessageCircle, Clock, Copy, Wifi, WifiOff } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Users, Plus, MessageCircle, Clock, Copy, Wifi, WifiOff, Heart, Lock, Globe, Bell, Megaphone, Activity, RefreshCw, Search } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import AffiliateBanner from "@/components/affiliate-banner"
 import { useAuth } from "@/lib/auth"
@@ -32,17 +33,24 @@ interface ChatRoom {
   createdAt: string
 }
 
+interface SystemNotification {
+  id: string
+  message: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  timestamp: Date
+}
+
 export default function GroupChatPage() {
-  const [newRoomName, setNewRoomName] = useState("")
-  const [newRoomDescription, setNewRoomDescription] = useState("")
-  const [newRoomAtmosphere, setNewRoomAtmosphere] = useState("romantic")
-  const [isCreating, setIsCreating] = useState(false)
   const [loading, setLoading] = useState(true)
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const { toast } = useToast()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const { user } = useAuth()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [userCount, setUserCount] = useState(0)
+  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([])
+  const [refreshing, setRefreshing] = useState(false)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -59,9 +67,9 @@ export default function GroupChatPage() {
     }
   }
 
-  const fetchChatRooms = async () => {
+  const fetchChatRooms = async (showLoading = true) => {
     try {
-      setLoading(true)
+      if (showLoading) setLoading(true)
       const response = await api.get("/chat/rooms")
       const rooms = response.data.rooms.map((room: any) => ({
         ...room,
@@ -76,58 +84,45 @@ export default function GroupChatPage() {
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
+      setRefreshing(false)
     }
   }
 
-  const createRoom = async () => {
-    if (!user) {
-      toast({
-        title: "ログインが必要です",
-        description: "チャットルームを作成するには、ユーザー登録・ログインが必要です。",
-        variant: "destructive",
-      })
-      setShowLoginModal(true)
-      return
+
+
+  const refreshRooms = () => {
+    setRefreshing(true)
+    fetchChatRooms(false)
+  }
+
+  const dismissNotification = (id: string) => {
+    setSystemNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success':
+        return '✅'
+      case 'warning':
+        return '⚠️'
+      case 'error':
+        return '❌'
+      default:
+        return 'ℹ️'
     }
-    if (!newRoomName.trim()) return
+  }
 
-    setIsCreating(true)
-
-    try {
-      const response = await api.post("/chat/rooms", {
-        name: newRoomName,
-        description: newRoomDescription || "新しく作成されたチャットルーム",
-        atmosphere: newRoomAtmosphere,
-        isPrivate: false,
-        maxMembers: 50,
-      })
-
-      const newRoom = {
-        ...response.data.room,
-        participantCount: 1,
-        onlineCount: 1,
-        messageCount: 0,
-        lastActivity: "今",
-      }
-
-      setChatRooms([newRoom, ...chatRooms])
-      setNewRoomName("")
-      setNewRoomDescription("")
-
-      toast({
-        title: "チャットルームを作成しました",
-        description: `「${newRoom.name}」が作成されました。招待URLをコピーして友達を招待しましょう！`,
-      })
-    } catch (error: any) {
-      console.error("Failed to create room:", error)
-      toast({
-        title: "エラー",
-        description: "チャットルームの作成に失敗しました",
-        variant: "destructive",
-      })
-    } finally {
-      setIsCreating(false)
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'success':
+        return 'border-green-500 bg-green-50'
+      case 'warning':
+        return 'border-yellow-500 bg-yellow-50'
+      case 'error':
+        return 'border-red-500 bg-red-50'
+      default:
+        return 'border-blue-500 bg-blue-50'
     }
   }
 
@@ -168,9 +163,35 @@ export default function GroupChatPage() {
       }
       const connectionInterval = setInterval(checkConnection, 5000)
 
+      // Set up real-time event listeners
+      const handleSystemAnnouncement = (announcement: any) => {
+        const notification: SystemNotification = {
+          id: Date.now().toString(),
+          message: announcement.message,
+          type: announcement.type || 'info',
+          timestamp: new Date()
+        }
+        setSystemNotifications(prev => [notification, ...prev.slice(0, 4)]) // Keep only 5 notifications
+        
+        toast({
+          title: "システムアナウンス",
+          description: announcement.message,
+          duration: 8000,
+        })
+      }
+
+      const handleUserCountUpdate = (count: number) => {
+        setUserCount(count)
+      }
+
+      socketService.onSystemAnnouncement(handleSystemAnnouncement)
+      socketService.onUserCountUpdate(handleUserCountUpdate)
+
       return () => {
         socketService.offRoomUpdated(handleRoomUpdated)
         socketService.offRoomCreated(handleNewRoom)
+        socketService.offSystemAnnouncement(handleSystemAnnouncement)
+        socketService.offUserCountUpdate(handleUserCountUpdate)
         clearInterval(connectionInterval)
       }
     }
@@ -226,198 +247,256 @@ export default function GroupChatPage() {
     }
   }
 
-  return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="space-y-8">
-        {/* Header */}
+  const filteredRooms = chatRooms.filter(room =>
+    room.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    room.description.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-4 mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">グループチャット</h1>
-            {user && (
-              <div className="flex items-center space-x-2">
-                {isConnected ? (
-                  <div className="flex items-center text-green-600">
-                    <Wifi className="w-4 h-4 mr-1" />
-                    <span className="text-sm">リアルタイム接続中</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center text-red-600">
-                    <WifiOff className="w-4 h-4 mr-1" />
-                    <span className="text-sm">接続なし</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            ライブチャット愛好者同士でリアルタイムに交流できるグループチャット機能です。
-            既存のルームに参加するか、新しいルームを作成して友達を招待しましょう。
-            {user && " リアルタイムで新しいルームや更新を受け取ります。"}
-          </p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
+          <p>チャットルームを読み込み中...</p>
         </div>
+      </div>
+    )
+  }
 
-        <AffiliateBanner size="large" position="content" />
-
-        {/* Create Room Section */}
-        <Card className="bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-pink-800">
-              <Plus className="w-5 h-5" />
-              <span>新しいチャットルームを作成</span>
-            </CardTitle>
-            <CardDescription className="text-pink-600">
-              あなた専用のチャットルームを作成して、友達を招待しましょう
-              {!user && " (ログインが必要です)"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Input
-                placeholder="ルーム名を入力してください"
-                value={newRoomName}
-                onChange={(e) => setNewRoomName(e.target.value)}
-                className="bg-white border-pink-200 focus:border-pink-400"
-                disabled={!user}
-              />
-              <select
-                value={newRoomAtmosphere}
-                onChange={(e) => setNewRoomAtmosphere(e.target.value)}
-                className="px-3 py-2 border border-pink-200 rounded-md bg-white focus:border-pink-400 focus:outline-none"
-                disabled={!user}
-              >
-                <option value="romantic">💕 ロマンチック</option>
-                <option value="intimate">🌹 親密</option>
-                <option value="friendly">😊 フレンドリー</option>
-              </select>
-            </div>
-            <Input
-              placeholder="ルームの説明を入力してください（オプション）"
-              value={newRoomDescription}
-              onChange={(e) => setNewRoomDescription(e.target.value)}
-              className="bg-white border-pink-200 focus:border-pink-400"
-              disabled={!user}
-            />
-            <div className="flex justify-end">
-              <Button
-                onClick={createRoom}
-                disabled={!newRoomName.trim() || isCreating}
-                className="bg-pink-600 hover:bg-pink-700"
-              >
-                {isCreating ? "作成中..." : "ルーム作成"}
-              </Button>
-            </div>
-            <p className="text-sm text-pink-600">💡 作成後に招待URLが生成されます。URLを共有して友達を招待できます。</p>
-          </CardContent>
-        </Card>
-
-        {/* Chat Rooms List */}
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">参加可能なチャットルーム</h2>
+          <h1 className="text-3xl font-bold mb-2">チャットルーム</h1>
+          <p className="text-gray-600">リアルタイムでコミュニケーションを楽しもう</p>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          {/* Connection Status */}
+          <div className="flex items-center gap-2">
+            {isConnected ? (
+              <Wifi className="h-4 w-4 text-green-500" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-500" />
+            )}
+            <Badge variant={isConnected ? "default" : "destructive"}>
+              {isConnected ? "リアルタイム接続中" : "接続なし"}
+            </Badge>
+          </div>
+          
+          {/* User Count */}
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="text-sm">{userCount} ユーザーオンライン</span>
+          </div>
+          
+          <Link href="/chat/create">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              ルーム作成
+            </Button>
+          </Link>
+        </div>
+      </div>
 
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">チャットルームを読み込み中...</p>
-            </div>
-          ) : chatRooms.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">まだチャットルームがありません。</p>
-              <p className="text-gray-600">最初のルームを作成してみましょう！</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {chatRooms.map((room) => (
-              <Card
-                key={room.id}
-                className="hover:shadow-lg transition-all duration-300 border-2 hover:border-pink-200"
+      {/* System Notifications */}
+      {systemNotifications.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Megaphone className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">システム通知</h2>
+          </div>
+          <div className="space-y-2">
+            {systemNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`p-3 rounded-lg border-l-4 ${getNotificationColor(notification.type)}`}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">{getNotificationIcon(notification.type)}</span>
                     <div className="flex-1">
-                      <CardTitle className="text-lg mb-2 text-gray-900">{room.name}</CardTitle>
-                      <Badge className={`text-xs ${getAtmosphereColor(room.atmosphere)}`}>
-                        {getAtmosphereLabel(room.atmosphere)}
-                      </Badge>
-                    </div>
-                    {room.isPrivate && (
-                      <Badge variant="secondary" className="text-xs">
-                        🔒 プライベート
-                      </Badge>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-gray-600 line-clamp-2">{room.description}</p>
-
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center space-x-3">
-                      <span className="flex items-center">
-                        <Users className="w-4 h-4 mr-1" />
-                        {room.participantCount}人
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {room.lastActivity}
-                      </span>
+                      <div className="text-sm font-medium">{notification.message}</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {notification.timestamp.toLocaleTimeString('ja-JP')}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="text-xs text-gray-400">作成者: {room.creator.nickname}</div>
-
-                  <div className="flex space-x-2">
-                    <Button className="flex-1 bg-pink-600 hover:bg-pink-700" onClick={() => handleJoinRoom(room.id)}>
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      参加する
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyInviteUrl(room.id, room.name)}
-                      className="border-pink-200 text-pink-600 hover:bg-pink-50"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => dismissNotification(notification.id)}
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
-          )}
         </div>
+      )}
 
-        <AffiliateBanner size="medium" position="content" />
+      {/* Search and Refresh */}
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="チャットルームを検索..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Button variant="outline" onClick={refreshRooms} disabled={refreshing}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          更新
+        </Button>
+      </div>
 
-        {/* Instructions */}
-        <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
-          <CardHeader>
-            <CardTitle className="text-purple-800">💕 ロマンチックなチャット体験</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-purple-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-blue-500" />
               <div>
-                <h4 className="font-semibold mb-2">🌹 チャットルームの特徴</h4>
-                <ul className="text-sm space-y-1">
-                  <li>• リアルタイムメッセージング</li>
-                  <li>• ロマンチックな雰囲気のデザイン</li>
-                  <li>• プライベートルーム作成可能</li>
-                  <li>• 招待URL機能</li>
-                </ul>
+                <div className="text-2xl font-bold">{chatRooms.length}</div>
+                <div className="text-sm text-gray-500">総ルーム数</div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-green-500" />
               <div>
-                <h4 className="font-semibold mb-2">💖 利用のマナー</h4>
-                <ul className="text-sm space-y-1">
-                  <li>• 相手を尊重した会話を心がけましょう</li>
-                  <li>• 不適切な内容は控えましょう</li>
-                  <li>• プライバシーを守りましょう</li>
-                  <li>• 楽しい雰囲気作りにご協力ください</li>
-                </ul>
+                <div className="text-2xl font-bold">{userCount}</div>
+                <div className="text-sm text-gray-500">オンライン</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-500" />
+              <div>
+                <div className="text-2xl font-bold">{filteredRooms.length}</div>
+                <div className="text-sm text-gray-500">検索結果</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-yellow-500" />
+              <div>
+                <div className="text-2xl font-bold">{systemNotifications.length}</div>
+                <div className="text-sm text-gray-500">新しい通知</div>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
+
+      {/* Chat Rooms Grid */}
+      {filteredRooms.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">チャットルームがありません</h3>
+            <p className="text-gray-500 mb-4">
+              {searchTerm ? "検索条件に一致するルームがありません" : "まだチャットルームがありません"}
+            </p>
+            <Link href="/chat/create">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                最初のルームを作成
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredRooms.map((room) => (
+            <Link key={room.id} href={`/chat/room/${room.id}`}>
+              <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg mb-2">{room.name}</CardTitle>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className={getAtmosphereColor(room.atmosphere)}>
+                          {getAtmosphereLabel(room.atmosphere)}
+                        </Badge>
+                        {room.isPrivate && (
+                          <Badge variant="secondary">
+                            <Lock className="h-3 w-3 mr-1" />
+                            プライベート
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <Heart className="h-5 w-5 text-gray-400" />
+                  </div>
+                </CardHeader>
+                
+                <CardContent>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    {room.description}
+                  </p>
+                  
+                  <div className="flex items-center justify-between text-sm text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">
+                          {room.creator.nickname[0]}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span>{room.creator.nickname}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        <span>{room.participantCount || 0}/{room.maxMembers}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MessageCircle className="h-4 w-4" />
+                        <span>{room.messageCount || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="mt-8 text-center">
+        <div className="flex justify-center gap-4">
+          <Link href="/demo-realtime">
+            <Button variant="outline">
+              <Activity className="h-4 w-4 mr-2" />
+              リアルタイム機能のデモ
+            </Button>
+          </Link>
+          <Link href="/admin-announcements">
+            <Button variant="outline">
+              <Megaphone className="h-4 w-4 mr-2" />
+              システムアナウンス管理
+            </Button>
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }

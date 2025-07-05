@@ -1,29 +1,228 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Heart, MessageSquare, Clock, User, Trophy, Medal, Award } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Heart, MessageSquare, Clock, User, Trophy, Medal, Award, Wifi, WifiOff, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth"
+import api from "@/api/axios"
+import socketService from "@/lib/socket"
 
-export const metadata = {
-  title: "人気ランキング - momoLand",
-  description: "いいね数に基づいた人気のライブチャット体験記ランキング",
+interface RankingPost {
+  id: string
+  title: string
+  excerpt: string
+  likesCount: number
+  commentsCount: number
+  viewCount: number
+  category: string
+  createdAt: string
+  updatedAt: string
+  author: {
+    id: string
+    nickname: string
+  }
+  rank: number
 }
 
 export default function RankingPage() {
-  // Sample ranking data
-  const rankingPosts = Array.from({ length: 50 }, (_, i) => ({
-    id: i + 1,
-    title: `人気体験記 ${i + 1}`,
-    author: `ユーザー${Math.floor(Math.random() * 20) + 1}`,
-    excerpt: "この体験記は多くのユーザーから支持を得ている人気の投稿です。詳細な体験談と有益な情報が含まれています...",
-    likes: Math.floor(Math.random() * 200) + 50,
-    comments: Math.floor(Math.random() * 50) + 10,
-    createdAt: `${Math.floor(Math.random() * 30) + 1}日前`,
-    category: ["初心者向け", "上級者向け", "おすすめ", "レビュー"][Math.floor(Math.random() * 4)],
-    rank: i + 1,
-  }))
-    .sort((a, b) => b.likes - a.likes)
-    .map((post, index) => ({ ...post, rank: index + 1 }))
+  const [rankingPosts, setRankingPosts] = useState<RankingPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isConnected, setIsConnected] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const { toast } = useToast()
+  const { user } = useAuth()
+
+  const fetchRankingData = async (showLoading = true, retryCount = 0): Promise<void> => {
+    try {
+      if (showLoading) setLoading(true)
+      
+      // Add a small delay to avoid race conditions
+      if (retryCount > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
+      }
+      
+      console.log(`🔄 Fetching ranking data (attempt ${retryCount + 1})`)
+      
+      // Try with explicit URL construction to avoid baseURL issues
+      const baseURL = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:3001/api' 
+        : (process.env.SERVER_URL || 'http://localhost:3001/api')
+      
+      const response = await api.get("/posts/ranking", {
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      
+      console.log("✅ Ranking data fetched successfully")
+      const posts = response.data.posts
+      setRankingPosts(posts)
+    } catch (error: any) {
+      console.error(`❌ Failed to fetch ranking data (attempt ${retryCount + 1}):`, error)
+      
+      // Retry up to 3 times for network errors
+      if (retryCount < 2 && (
+        error.code === 'NETWORK_ERROR' || 
+        error.message?.includes('Network Error') ||
+        error.message?.includes('ERR_NETWORK') ||
+        !error.response
+      )) {
+        console.log(`🔄 Retrying... (${retryCount + 1}/3)`)
+        return fetchRankingData(showLoading, retryCount + 1)
+      }
+      
+      // Show specific error messages based on error type
+      let errorMessage = "ランキングデータの取得に失敗しました"
+      
+      if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+        errorMessage = "ネットワーク接続に問題があります。しばらくしてから再試行してください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "ランキングエンドポイントが見つかりません。"
+      } else if (error.response?.status >= 500) {
+        errorMessage = "サーバーエラーが発生しました。管理者にお問い合わせください。"
+      }
+      
+      toast({
+        title: "エラー",
+        description: errorMessage,
+        variant: "destructive",
+      })
+      
+      // Set empty array on final failure
+      if (retryCount >= 2) {
+        setRankingPosts([])
+      }
+    } finally {
+      if (showLoading) setLoading(false)
+      setRefreshing(false)
+    }
+  }
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchRankingData(false)
+  }
+
+  const testConnection = async () => {
+    setTesting(true)
+    try {
+      console.log("🧪 Testing API connectivity...")
+      
+      // Test health endpoint first
+      const healthResponse = await api.get("/health")
+      console.log("✅ Health check passed:", healthResponse.data)
+      
+      // Test ranking endpoint
+      const rankingResponse = await api.get("/posts/ranking")
+      console.log("✅ Ranking endpoint test passed:", rankingResponse.data)
+      
+      toast({
+        title: "接続テスト成功",
+        description: "APIエンドポイントへの接続は正常です",
+      })
+      
+      // Refresh data after successful test
+      fetchRankingData(false)
+      
+    } catch (error: any) {
+      console.error("❌ Connection test failed:", error)
+      toast({
+        title: "接続テスト失敗",
+        description: `API接続に問題があります: ${error.message}`,
+        variant: "destructive",
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchRankingData()
+  }, [])
+
+  // Set up WebSocket for real-time updates
+  useEffect(() => {
+    if (user) {
+      console.log("🔗 Setting up WebSocket for ranking page")
+      setIsConnected(socketService.isConnectedToServer())
+
+      const handlePostLike = (data: { postId: string; likesCount: number; isLiked: boolean }) => {
+        console.log("📊 Ranking: Post like received", data)
+        setRankingPosts(prevPosts => {
+          const updatedPosts = prevPosts.map(post => 
+            post.id === data.postId 
+              ? { ...post, likesCount: data.likesCount }
+              : post
+          )
+          // Re-sort and update ranks
+          return updatedPosts
+            .sort((a, b) => b.likesCount - a.likesCount)
+            .map((post, index) => ({ ...post, rank: index + 1 }))
+        })
+      }
+
+      const handleNewPost = (newPost: any) => {
+        setRankingPosts(prevPosts => {
+          const updatedPosts = [newPost, ...prevPosts]
+          // Re-sort and update ranks
+          return updatedPosts
+            .sort((a, b) => b.likesCount - a.likesCount)
+            .map((post, index) => ({ ...post, rank: index + 1 }))
+            .slice(0, 50) // Keep top 50
+        })
+      }
+
+      const handleNewComment = (comment: any) => {
+        setRankingPosts(prevPosts => 
+          prevPosts.map(post => 
+            post.id === comment.postId 
+              ? { ...post, commentsCount: post.commentsCount + 1 }
+              : post
+          )
+        )
+      }
+
+      socketService.onPostLike(handlePostLike)
+      socketService.onNewPost(handleNewPost)
+      socketService.onNewComment(handleNewComment)
+
+      // Update connection status
+      const checkConnection = () => {
+        setIsConnected(socketService.isConnectedToServer())
+      }
+      const connectionInterval = setInterval(checkConnection, 5000)
+
+      return () => {
+        socketService.offPostLike(handlePostLike)
+        socketService.offNewPost(handleNewPost)
+        socketService.offNewComment(handleNewComment)
+        clearInterval(connectionInterval)
+      }
+    }
+  }, [user])
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    
+    if (diffInHours < 1) {
+      return "1時間未満前"
+    } else if (diffInHours < 24) {
+      return `${diffInHours}時間前`
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24)
+      return `${diffInDays}日前`
+    }
+  }
 
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -56,12 +255,65 @@ export default function RankingPage() {
       <div className="space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">🏆 人気ランキング</h1>
+          <div className="flex items-center justify-center space-x-4 mb-4">
+            <h1 className="text-3xl font-bold text-gray-900">🏆 人気ランキング</h1>
+            {user && (
+              <div className="flex items-center space-x-2">
+                {isConnected ? (
+                  <div className="flex items-center text-green-600">
+                    <Wifi className="w-4 h-4 mr-1" />
+                    <span className="text-sm">リアルタイム更新中</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-red-600">
+                    <WifiOff className="w-4 h-4 mr-1" />
+                    <span className="text-sm">接続なし</span>
+                  </div>
+                )}
+                <Button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  variant="outline"
+                  size="sm"
+                  className="ml-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                </Button>
+                <Button
+                  onClick={testConnection}
+                  disabled={testing}
+                  variant="outline"
+                  size="sm"
+                  className="ml-2"
+                >
+                  {testing ? "テスト中..." : "接続テスト"}
+                </Button>
+              </div>
+            )}
+          </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
             いいね数に基づいた人気のライブチャット体験記ランキングです。
             多くのユーザーから支持を得ている投稿をチェックしてみましょう。
+            {user && " リアルタイムでランキングが更新されます。"}
           </p>
         </div>
+
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">ランキングを読み込み中...</p>
+          </div>
+        ) : rankingPosts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600">まだ投稿がありません。</p>
+            <Link href="/post">
+              <Button className="mt-4 bg-pink-600 hover:bg-pink-700">
+                最初の投稿を作成する
+              </Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-8">
 
         <AffiliateBanner size="large" position="content" />
 
@@ -87,7 +339,7 @@ export default function RankingPage() {
                 <CardTitle className="text-lg">{post.title}</CardTitle>
                 <CardDescription className="flex items-center">
                   <User className="w-4 h-4 mr-1" />
-                  {post.author}
+                  {post.author.nickname}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -96,15 +348,15 @@ export default function RankingPage() {
                   <div className="flex items-center space-x-4 text-gray-500">
                     <span className="flex items-center font-semibold text-red-600">
                       <Heart className="w-4 h-4 mr-1 fill-current" />
-                      {post.likes}
+                      {post.likesCount}
                     </span>
                     <span className="flex items-center">
                       <MessageSquare className="w-4 h-4 mr-1 text-blue-500" />
-                      {post.comments}
+                      {post.commentsCount}
                     </span>
                     <span className="flex items-center">
                       <Clock className="w-4 h-4 mr-1" />
-                      {post.createdAt}
+                      {formatDate(post.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -156,11 +408,11 @@ export default function RankingPage() {
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                       <span className="flex items-center">
                         <User className="w-3 h-3 mr-1" />
-                        {post.author}
+                        {post.author.nickname}
                       </span>
                       <span className="flex items-center">
                         <Clock className="w-3 h-3 mr-1" />
-                        {post.createdAt}
+                        {formatDate(post.createdAt)}
                       </span>
                     </div>
                   </Link>
@@ -170,11 +422,11 @@ export default function RankingPage() {
                   <div className="flex items-center space-x-3 text-sm">
                     <span className="flex items-center font-semibold text-red-600">
                       <Heart className="w-4 h-4 mr-1 fill-current" />
-                      {post.likes}
+                      {post.likesCount}
                     </span>
                     <span className="flex items-center text-blue-600">
                       <MessageSquare className="w-4 h-4 mr-1" />
-                      {post.comments}
+                      {post.commentsCount}
                     </span>
                   </div>
                 </div>
@@ -213,6 +465,8 @@ export default function RankingPage() {
             </div>
           </CardContent>
         </Card>
+          </div>
+        )}
       </div>
     </div>
   )

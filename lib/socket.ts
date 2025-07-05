@@ -328,6 +328,173 @@ class SocketService {
   getSocket(): Socket | null {
     return this.socket
   }
+
+  // Enhanced chat features
+  sendTypingIndicator(roomId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit("typing", { roomId })
+    }
+  }
+
+  stopTypingIndicator(roomId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit("stop-typing", { roomId })
+    }
+  }
+
+  // Real-time notifications
+  onNotification(callback: (notification: any) => void) {
+    if (this.socket) {
+      this.socket.on("notification", callback)
+    }
+  }
+
+  // User activity tracking
+  reportUserActivity(activity: string, data?: any) {
+    if (this.socket?.connected) {
+      this.socket.emit("user-activity", { activity, data, timestamp: new Date() })
+    }
+  }
+
+  // System events
+  onSystemAnnouncement(callback: (announcement: any) => void) {
+    if (this.socket) {
+      this.socket.on("system-announcement", callback)
+    }
+  }
+
+  // Live user count
+  onUserCountUpdate(callback: (count: number) => void) {
+    if (this.socket) {
+      this.socket.on("user-count-update", callback)
+    }
+  }
+
+  // Enhanced typing indicators
+  onTypingStart(callback: (data: { userId: string; nickname: string; roomId: string }) => void) {
+    if (this.socket) {
+      this.socket.on("user-typing", callback)
+    }
+  }
+
+  onTypingStop(callback: (data: { userId: string; roomId: string }) => void) {
+    if (this.socket) {
+      this.socket.on("user-stopped-typing", callback)
+    }
+  }
+
+  // Real-time reactions
+  sendReaction(roomId: string, messageId: string, emoji: string) {
+    if (this.socket?.connected) {
+      this.socket.emit("send-reaction", { roomId, messageId, emoji })
+    }
+  }
+
+  onReactionAdded(callback: (data: { messageId: string; emoji: string; userId: string; nickname: string }) => void) {
+    if (this.socket) {
+      this.socket.on("reaction-added", callback)
+    }
+  }
+
+  // Live document collaboration (for posts)
+  joinDocumentEdit(postId: string) {
+    if (this.socket?.connected) {
+      this.socket.emit("join-document-edit", { postId })
+    }
+  }
+
+  sendDocumentChange(postId: string, changes: any) {
+    if (this.socket?.connected) {
+      this.socket.emit("document-change", { postId, changes })
+    }
+  }
+
+  onDocumentChange(callback: (data: { postId: string; changes: any; userId: string }) => void) {
+    if (this.socket) {
+      this.socket.on("document-changed", callback)
+    }
+  }
+
+  // Geographic location sharing (optional)
+  shareLocation(roomId: string, location: { lat: number; lng: number }) {
+    if (this.socket?.connected) {
+      this.socket.emit("share-location", { roomId, location })
+    }
+  }
+
+  onLocationShared(callback: (data: { userId: string; nickname: string; location: any; timestamp: Date }) => void) {
+    if (this.socket) {
+      this.socket.on("location-shared", callback)
+    }
+  }
+
+  // Voice/Video call signaling
+  initiateCall(roomId: string, callType: 'voice' | 'video') {
+    if (this.socket?.connected) {
+      this.socket.emit("initiate-call", { roomId, callType })
+    }
+  }
+
+  onCallInitiated(callback: (data: { roomId: string; callType: string; initiator: any }) => void) {
+    if (this.socket) {
+      this.socket.on("call-initiated", callback)
+    }
+  }
+
+  // Enhanced cleanup methods
+  offNotification(callback?: (notification: any) => void) {
+    if (this.socket) {
+      this.socket.off("notification", callback)
+    }
+  }
+
+  offSystemAnnouncement(callback?: (announcement: any) => void) {
+    if (this.socket) {
+      this.socket.off("system-announcement", callback)
+    }
+  }
+
+  offUserCountUpdate(callback?: (count: number) => void) {
+    if (this.socket) {
+      this.socket.off("user-count-update", callback)
+    }
+  }
+
+  offTypingStart(callback?: (data: { userId: string; nickname: string; roomId: string }) => void) {
+    if (this.socket) {
+      this.socket.off("user-typing", callback)
+    }
+  }
+
+  offTypingStop(callback?: (data: { userId: string; roomId: string }) => void) {
+    if (this.socket) {
+      this.socket.off("user-stopped-typing", callback)
+    }
+  }
+
+  offReactionAdded(callback?: (data: { messageId: string; emoji: string; userId: string; nickname: string }) => void) {
+    if (this.socket) {
+      this.socket.off("reaction-added", callback)
+    }
+  }
+
+  offDocumentChange(callback?: (data: { postId: string; changes: any; userId: string }) => void) {
+    if (this.socket) {
+      this.socket.off("document-changed", callback)
+    }
+  }
+
+  offLocationShared(callback?: (data: { userId: string; nickname: string; location: any; timestamp: Date }) => void) {
+    if (this.socket) {
+      this.socket.off("location-shared", callback)
+    }
+  }
+
+  offCallInitiated(callback?: (data: { roomId: string; callType: string; initiator: any }) => void) {
+    if (this.socket) {
+      this.socket.off("call-initiated", callback)
+    }
+  }
 }
 
 // Export singleton instance
