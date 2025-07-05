@@ -10,9 +10,10 @@ require("dotenv").config()
 const authRoutes = require("./routes/auth")
 const userRoutes = require("./routes/users")
 const postRoutes = require("./routes/posts")
-const chatRoutes = require("./routes/chat")
+const { router: chatRoutes, setSocketIO: setChatSocketIO } = require("./routes/chat")
 const reportRoutes = require("./routes/reports")
 const { setupSocketHandlers } = require("./socket/handlers")
+const { setSocketIO } = require("./socket/socketService")
 
 const app = express()
 const server = createServer(app)
@@ -48,6 +49,8 @@ const limiter = rateLimit({
 app.use("/api/", limiter)
 
 // Socket.IO setup
+setSocketIO(io)
+setChatSocketIO(io)
 setupSocketHandlers(io)
 
 // Routes

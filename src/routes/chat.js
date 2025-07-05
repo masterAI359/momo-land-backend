@@ -5,6 +5,12 @@ const { authenticateToken } = require("../middleware/auth")
 
 const router = express.Router()
 
+// Get socket.io instance - will be set by server.js
+let io = null
+const setSocketIO = (socketIO) => {
+  io = socketIO
+}
+
 // Get all chat rooms
 router.get("/rooms", authenticateToken, async (req, res) => {
   try {
@@ -108,6 +114,17 @@ router.post(
           isOnline: true,
         },
       })
+
+      // Broadcast new room to all connected clients
+      if (io) {
+        io.emit("room-created", {
+          ...room,
+          participantCount: 1,
+          onlineCount: 1,
+          messageCount: 0,
+          lastActivity: room.createdAt,
+        })
+      }
 
       res.status(201).json({
         message: "Chat room created successfully",
@@ -286,4 +303,4 @@ router.post("/rooms/:id/leave", authenticateToken, async (req, res) => {
   }
 })
 
-module.exports = router
+module.exports = { router, setSocketIO }

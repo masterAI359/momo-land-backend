@@ -3,12 +3,18 @@ const prisma = require("../config/database")
 
 const authenticateSocket = async (socket, next) => {
   try {
+    console.log("🔐 WebSocket authentication attempt")
     const token = socket.handshake.auth.token
+    console.log("Token received:", token ? "Token present" : "No token")
+    
     if (!token) {
+      console.log("❌ No token provided")
       return next(new Error("Authentication error"))
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    console.log("✅ Token decoded successfully, userId:", decoded.userId)
+    
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: {
@@ -19,12 +25,15 @@ const authenticateSocket = async (socket, next) => {
     })
 
     if (!user) {
+      console.log("❌ User not found in database")
       return next(new Error("User not found"))
     }
 
+    console.log("✅ User authenticated:", user.nickname)
     socket.user = user
     next()
   } catch (error) {
+    console.log("❌ Authentication error:", error.message)
     next(new Error("Authentication error"))
   }
 }
@@ -33,7 +42,28 @@ const setupSocketHandlers = (io) => {
   io.use(authenticateSocket)
 
   io.on("connection", (socket) => {
-    console.log(`User ${socket.user.nickname} connected`)
+    console.log(`🚀 User ${socket.user.nickname} connected to WebSocket`)
+
+    // Blog post real-time events
+    socket.on("join-blog-room", () => {
+      socket.join("blog-room")
+      console.log(`📢 User ${socket.user.nickname} joined blog room`)
+    })
+
+    socket.on("leave-blog-room", () => {
+      socket.leave("blog-room")
+      console.log(`User ${socket.user.nickname} left blog room`)
+    })
+
+    socket.on("join-post-room", (postId) => {
+      socket.join(`post-${postId}`)
+      console.log(`User ${socket.user.nickname} joined post room ${postId}`)
+    })
+
+    socket.on("leave-post-room", (postId) => {
+      socket.leave(`post-${postId}`)
+      console.log(`User ${socket.user.nickname} left post room ${postId}`)
+    })
 
     // Join room
     socket.on("join-room", async (roomId) => {
