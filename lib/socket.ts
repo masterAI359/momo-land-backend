@@ -6,33 +6,51 @@ class SocketService {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
+  private pingInterval: NodeJS.Timeout | null = null
+  private connectionHealthInterval: NodeJS.Timeout | null = null
 
   connect(token: string) {
     if (this.socket?.connected) {
-      console.log("WebSocket already connected")
+      console.log("🔌 WebSocket already connected")
       return
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
-    console.log("Connecting to WebSocket server:", serverUrl)
-    console.log("Using token:", token ? "Token provided" : "No token")
+    // Socket.IO connects to the root server URL, not the /api endpoint
+    let serverUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
+                   process.env.NEXT_PUBLIC_SERVER_URL || 
+                   "http://localhost:3001"
+    
+    // Remove /api suffix if present (Socket.IO runs on root path)
+    if (serverUrl.endsWith('/api')) {
+      serverUrl = serverUrl.replace('/api', '')
+    }
+    
+    console.log("🔌 Connecting to WebSocket server:", serverUrl)
+    console.log("🔑 Using token:", token ? "Token provided" : "No token")
 
     this.socket = io(serverUrl, {
       auth: {
         token,
       },
       transports: ["websocket", "polling"],
+      forceNew: false,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
+      timeout: 20000,
     })
 
     this.socket.on("connect", () => {
       console.log("✅ Connected to WebSocket server")
       this.isConnected = true
       this.reconnectAttempts = 0
+      this.startHealthMonitoring()
     })
 
     this.socket.on("disconnect", (reason) => {
-      console.log("Disconnected from WebSocket server:", reason)
+      console.log("❌ Disconnected from WebSocket server:", reason)
       this.isConnected = false
+      this.stopHealthMonitoring()
       
       if (reason === "io server disconnect") {
         // Server disconnected, try to reconnect
@@ -41,35 +59,91 @@ class SocketService {
     })
 
     this.socket.on("connect_error", (error) => {
-      console.error("WebSocket connection error:", error)
+      console.error("❌ WebSocket connection error:", error)
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        error: error
+      })
       this.isConnected = false
       this.handleReconnect(token)
     })
 
     this.socket.on("error", (error) => {
-      console.error("WebSocket error:", error)
+      console.error("❌ WebSocket error:", error)
     })
+
+    // Debug connection status
+    this.socket.on("reconnect", (attempt) => {
+      console.log(`🔁 WebSocket reconnected after ${attempt} attempts`)
+    })
+
+    this.socket.on("reconnect_attempt", (attempt) => {
+      console.log(`🔄 WebSocket reconnection attempt ${attempt}`)
+    })
+
+    this.socket.on("reconnect_failed", () => {
+      console.error("❌ WebSocket reconnection failed")
+    })
+
+    // Health monitoring
+    this.socket.on("pong", (data) => {
+      console.log("🏓 Pong received:", data)
+    })
+  }
+
+  private startHealthMonitoring() {
+    // Send ping every 30 seconds to monitor connection health
+    this.pingInterval = setInterval(() => {
+      if (this.socket?.connected) {
+        console.log("🏓 Sending ping...")
+        this.socket.emit("ping")
+      }
+    }, 30000)
+
+    // Check connection status every 5 seconds
+    this.connectionHealthInterval = setInterval(() => {
+      const wasConnected = this.isConnected
+      this.isConnected = this.socket?.connected === true
+      
+      if (wasConnected !== this.isConnected) {
+        console.log(`🔍 Connection status changed: ${wasConnected ? 'Connected' : 'Disconnected'} -> ${this.isConnected ? 'Connected' : 'Disconnected'}`)
+      }
+    }, 5000)
+  }
+
+  private stopHealthMonitoring() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
+    }
+    if (this.connectionHealthInterval) {
+      clearInterval(this.connectionHealthInterval)
+      this.connectionHealthInterval = null
+    }
   }
 
   private handleReconnect(token: string) {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
-      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
+      console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
       
       setTimeout(() => {
         this.connect(token)
       }, this.reconnectDelay * this.reconnectAttempts)
     } else {
-      console.error("Max reconnection attempts reached")
+      console.error("❌ Max reconnection attempts reached")
     }
   }
 
   disconnect() {
     if (this.socket) {
+      this.stopHealthMonitoring()
       this.socket.disconnect()
       this.socket = null
       this.isConnected = false
       this.reconnectAttempts = 0
+      console.log("🔌 WebSocket disconnected")
     }
   }
 
@@ -329,170 +403,17 @@ class SocketService {
     return this.socket
   }
 
-  // Enhanced chat features
-  sendTypingIndicator(roomId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit("typing", { roomId })
+  // Get connection info for debugging
+  getConnectionInfo() {
+    if (!this.socket) {
+      return { connected: false, socketId: null }
     }
-  }
-
-  stopTypingIndicator(roomId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit("stop-typing", { roomId })
-    }
-  }
-
-  // Real-time notifications
-  onNotification(callback: (notification: any) => void) {
-    if (this.socket) {
-      this.socket.on("notification", callback)
-    }
-  }
-
-  // User activity tracking
-  reportUserActivity(activity: string, data?: any) {
-    if (this.socket?.connected) {
-      this.socket.emit("user-activity", { activity, data, timestamp: new Date() })
-    }
-  }
-
-  // System events
-  onSystemAnnouncement(callback: (announcement: any) => void) {
-    if (this.socket) {
-      this.socket.on("system-announcement", callback)
-    }
-  }
-
-  // Live user count
-  onUserCountUpdate(callback: (count: number) => void) {
-    if (this.socket) {
-      this.socket.on("user-count-update", callback)
-    }
-  }
-
-  // Enhanced typing indicators
-  onTypingStart(callback: (data: { userId: string; nickname: string; roomId: string }) => void) {
-    if (this.socket) {
-      this.socket.on("user-typing", callback)
-    }
-  }
-
-  onTypingStop(callback: (data: { userId: string; roomId: string }) => void) {
-    if (this.socket) {
-      this.socket.on("user-stopped-typing", callback)
-    }
-  }
-
-  // Real-time reactions
-  sendReaction(roomId: string, messageId: string, emoji: string) {
-    if (this.socket?.connected) {
-      this.socket.emit("send-reaction", { roomId, messageId, emoji })
-    }
-  }
-
-  onReactionAdded(callback: (data: { messageId: string; emoji: string; userId: string; nickname: string }) => void) {
-    if (this.socket) {
-      this.socket.on("reaction-added", callback)
-    }
-  }
-
-  // Live document collaboration (for posts)
-  joinDocumentEdit(postId: string) {
-    if (this.socket?.connected) {
-      this.socket.emit("join-document-edit", { postId })
-    }
-  }
-
-  sendDocumentChange(postId: string, changes: any) {
-    if (this.socket?.connected) {
-      this.socket.emit("document-change", { postId, changes })
-    }
-  }
-
-  onDocumentChange(callback: (data: { postId: string; changes: any; userId: string }) => void) {
-    if (this.socket) {
-      this.socket.on("document-changed", callback)
-    }
-  }
-
-  // Geographic location sharing (optional)
-  shareLocation(roomId: string, location: { lat: number; lng: number }) {
-    if (this.socket?.connected) {
-      this.socket.emit("share-location", { roomId, location })
-    }
-  }
-
-  onLocationShared(callback: (data: { userId: string; nickname: string; location: any; timestamp: Date }) => void) {
-    if (this.socket) {
-      this.socket.on("location-shared", callback)
-    }
-  }
-
-  // Voice/Video call signaling
-  initiateCall(roomId: string, callType: 'voice' | 'video') {
-    if (this.socket?.connected) {
-      this.socket.emit("initiate-call", { roomId, callType })
-    }
-  }
-
-  onCallInitiated(callback: (data: { roomId: string; callType: string; initiator: any }) => void) {
-    if (this.socket) {
-      this.socket.on("call-initiated", callback)
-    }
-  }
-
-  // Enhanced cleanup methods
-  offNotification(callback?: (notification: any) => void) {
-    if (this.socket) {
-      this.socket.off("notification", callback)
-    }
-  }
-
-  offSystemAnnouncement(callback?: (announcement: any) => void) {
-    if (this.socket) {
-      this.socket.off("system-announcement", callback)
-    }
-  }
-
-  offUserCountUpdate(callback?: (count: number) => void) {
-    if (this.socket) {
-      this.socket.off("user-count-update", callback)
-    }
-  }
-
-  offTypingStart(callback?: (data: { userId: string; nickname: string; roomId: string }) => void) {
-    if (this.socket) {
-      this.socket.off("user-typing", callback)
-    }
-  }
-
-  offTypingStop(callback?: (data: { userId: string; roomId: string }) => void) {
-    if (this.socket) {
-      this.socket.off("user-stopped-typing", callback)
-    }
-  }
-
-  offReactionAdded(callback?: (data: { messageId: string; emoji: string; userId: string; nickname: string }) => void) {
-    if (this.socket) {
-      this.socket.off("reaction-added", callback)
-    }
-  }
-
-  offDocumentChange(callback?: (data: { postId: string; changes: any; userId: string }) => void) {
-    if (this.socket) {
-      this.socket.off("document-changed", callback)
-    }
-  }
-
-  offLocationShared(callback?: (data: { userId: string; nickname: string; location: any; timestamp: Date }) => void) {
-    if (this.socket) {
-      this.socket.off("location-shared", callback)
-    }
-  }
-
-  offCallInitiated(callback?: (data: { roomId: string; callType: string; initiator: any }) => void) {
-    if (this.socket) {
-      this.socket.off("call-initiated", callback)
+    
+    return {
+      connected: this.socket.connected,
+      socketId: this.socket.id,
+      isConnected: this.isConnected,
+      reconnectAttempts: this.reconnectAttempts
     }
   }
 }

@@ -210,200 +210,18 @@ const setupSocketHandlers = (io) => {
       }
     })
 
-    // Enhanced typing indicators
-    socket.on("typing", (data) => {
-      const { roomId } = data
-      if (socket.currentRoom === roomId) {
-        socket.to(roomId).emit("user-typing", {
-          userId: socket.user.id,
-          nickname: socket.user.nickname,
-          roomId: roomId,
-        })
-      }
-    })
+    // Handle disconnect
+    socket.on("disconnect", async () => {
+      console.log(`User ${socket.user.nickname} disconnected`)
 
-    socket.on("stop-typing", (data) => {
-      const { roomId } = data
-      if (socket.currentRoom === roomId) {
-        socket.to(roomId).emit("user-stopped-typing", {
-          userId: socket.user.id,
-          roomId: roomId,
-        })
-      }
-    })
-
-    // Real-time reactions
-    socket.on("send-reaction", async (data) => {
       try {
-        const { roomId, messageId, emoji } = data
-        
-        if (socket.currentRoom !== roomId) {
-          socket.emit("error", { message: "Not in room" })
-          return
-        }
-
-        // Save reaction to database (optional)
-        // await prisma.messageReaction.create({
-        //   data: {
-        //     messageId,
-        //     userId: socket.user.id,
-        //     emoji,
-        //   },
-        // })
-
-        // Broadcast reaction to room
-        io.to(roomId).emit("reaction-added", {
-          messageId,
-          emoji,
-          userId: socket.user.id,
-          nickname: socket.user.nickname,
-        })
-      } catch (error) {
-        console.error("Send reaction error:", error)
-        socket.emit("error", { message: "Failed to send reaction" })
-      }
-    })
-
-    // User activity tracking
-    socket.on("user-activity", (data) => {
-      const { activity, data: activityData, timestamp } = data
-      console.log(`👤 User ${socket.user.nickname} activity: ${activity}`, activityData)
-      
-      // Optional: Store activity in database for analytics
-      // You can track user engagement, popular features, etc.
-    })
-
-    // Live document collaboration
-    socket.on("join-document-edit", async (data) => {
-      try {
-        const { postId } = data
-        
-        // Verify user has permission to edit
-        const post = await prisma.post.findUnique({
-          where: { id: postId },
-          select: { authorId: true },
-        })
-
-        if (!post || post.authorId !== socket.user.id) {
-          socket.emit("error", { message: "Not authorized to edit this post" })
-          return
-        }
-
-        socket.join(`document-${postId}`)
-        console.log(`📝 User ${socket.user.nickname} joined document editing for post ${postId}`)
-      } catch (error) {
-        console.error("Join document edit error:", error)
-        socket.emit("error", { message: "Failed to join document editing" })
-      }
-    })
-
-    socket.on("document-change", (data) => {
-      const { postId, changes } = data
-      
-      // Broadcast changes to other editors
-      socket.to(`document-${postId}`).emit("document-changed", {
-        postId,
-        changes,
-        userId: socket.user.id,
-        nickname: socket.user.nickname,
-      })
-    })
-
-    // Location sharing
-    socket.on("share-location", async (data) => {
-      try {
-        const { roomId, location } = data
-        
-        if (socket.currentRoom !== roomId) {
-          socket.emit("error", { message: "Not in room" })
-          return
-        }
-
-        // Optional: Save location to database
-        // await prisma.sharedLocation.create({
-        //   data: {
-        //     roomId,
-        //     userId: socket.user.id,
-        //     latitude: location.lat,
-        //     longitude: location.lng,
-        //   },
-        // })
-
-        // Broadcast location to room
-        socket.to(roomId).emit("location-shared", {
-          userId: socket.user.id,
-          nickname: socket.user.nickname,
-          location,
-          timestamp: new Date(),
-        })
-      } catch (error) {
-        console.error("Share location error:", error)
-        socket.emit("error", { message: "Failed to share location" })
-      }
-    })
-
-    // Voice/Video call signaling
-    socket.on("initiate-call", async (data) => {
-      try {
-        const { roomId, callType } = data
-        
-        if (socket.currentRoom !== roomId) {
-          socket.emit("error", { message: "Not in room" })
-          return
-        }
-
-        // Broadcast call initiation to room
-        socket.to(roomId).emit("call-initiated", {
-          roomId,
-          callType,
-          initiator: {
-            id: socket.user.id,
-            nickname: socket.user.nickname,
-          },
-        })
-      } catch (error) {
-        console.error("Initiate call error:", error)
-        socket.emit("error", { message: "Failed to initiate call" })
-      }
-    })
-
-    // Global user count tracking
-    const updateUserCount = () => {
-      const userCount = io.sockets.sockets.size
-      io.emit("user-count-update", userCount)
-    }
-
-    // Send notifications to specific users
-    const sendNotification = (userId, notification) => {
-      const userSockets = Array.from(io.sockets.sockets.values())
-        .filter(s => s.user && s.user.id === userId)
-      
-      userSockets.forEach(s => {
-        s.emit("notification", notification)
-      })
-    }
-
-    // System announcements (admin only)
-    socket.on("system-announcement", (data) => {
-      // Add admin check here
-      if (socket.user.role === "admin") {
-        io.emit("system-announcement", {
-          message: data.message,
-          type: data.type || "info",
-          timestamp: new Date(),
-        })
-      }
-    })
-
-    // Enhanced disconnect handling
-    socket.on("disconnect", async (reason) => {
-      console.log(`User ${socket.user.nickname} disconnected: ${reason}`)
-      
-      try {
-        // Update user offline status in all rooms
         if (socket.currentRoom) {
+          // Update user offline status
           await prisma.roomMember.updateMany({
-            where: { userId: socket.user.id },
+            where: {
+              userId: socket.user.id,
+              isOnline: true,
+            },
             data: {
               isOnline: false,
               lastSeen: new Date(),
@@ -416,16 +234,10 @@ const setupSocketHandlers = (io) => {
             timestamp: new Date(),
           })
         }
-
-        // Update global user count
-        updateUserCount()
       } catch (error) {
-        console.error("Disconnect cleanup error:", error)
+        console.error("Disconnect error:", error)
       }
     })
-
-    // Initial user count update
-    updateUserCount()
   })
 }
 
