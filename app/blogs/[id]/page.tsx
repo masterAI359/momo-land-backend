@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
   Card,
@@ -68,6 +68,7 @@ export default function BlogPostPage() {
   const [error, setError] = useState<string | null>(null);
   const [liking, setLiking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [realtimeUpdates, setRealtimeUpdates] = useState(0);
 
   const fetchPost = async () => {
     try {
@@ -95,27 +96,45 @@ export default function BlogPostPage() {
 
     try {
       setLiking(true);
-      await api.post(`/posts/${params.id}/like`);
-
-      // Update the post state
+      console.log(`📖 Blog Post: Sending like request for post ${params.id}`);
+      
+      const response = await api.post(`/posts/${params.id}/like`);
+      
+      // Optimistically update the post state
+      const newIsLiked = !post?.isLiked;
       setPost((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          isLiked: !prev.isLiked,
-          likesCount: prev.isLiked ? prev.likesCount - 1 : prev.likesCount + 1,
+          isLiked: newIsLiked,
+          likesCount: newIsLiked ? prev.likesCount + 1 : prev.likesCount - 1,
         };
       });
 
       toast({
-        title: post?.isLiked ? "いいねを取り消しました" : "いいねしました",
-        description: "ありがとうございます！",
+        title: newIsLiked ? "いいねしました！" : "いいねを取り消しました",
+        description: newIsLiked 
+          ? `${isConnected ? 'リアルタイムで他のユーザーに表示されます' : 'ありがとうございます！'}` 
+          : "いいねを取り消しました",
       });
+
+      console.log("📖 Blog Post: Like action completed, real-time event should be emitted");
     } catch (error: any) {
-      console.error("Failed to like post:", error);
+      console.error("❌ Blog Post: Failed to like post:", error);
+      
+      // Revert optimistic update on error
+      setPost((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          isLiked: post?.isLiked || false,
+          likesCount: post?.likesCount || 0,
+        };
+      });
+      
       toast({
         title: "エラー",
-        description: "いいねの処理に失敗しました。",
+        description: "いいねの処理に失敗しました。もう一度お試しください。",
         variant: "destructive",
       });
     } finally {
@@ -134,6 +153,48 @@ export default function BlogPostPage() {
     });
   };
 
+  // Handle new comment added via comment form
+  const handleCommentAdded = (newComment: Comment) => {
+    console.log("📖 Blog Post: Comment added via form", newComment);
+    setPost((prevPost) => {
+      if (!prevPost) return prevPost;
+      
+      // Check if comment already exists to prevent duplicates
+      const existingComments = prevPost.comments || [];
+      const commentExists = existingComments.some(existingComment => existingComment.id === newComment.id);
+      
+      if (commentExists) {
+        console.log("📖 Blog Post: Comment already exists, skipping");
+        return prevPost;
+      }
+
+      return {
+        ...prevPost,
+        comments: [...existingComments, newComment],
+      };
+    });
+
+    toast({
+      title: "コメントが投稿されました",
+      description: `${isConnected ? 'リアルタイムで他のユーザーに表示されます' : '投稿が完了しました'}`,
+    });
+  };
+
+  // Process comments to remove duplicates and sort chronologically
+  const processedComments = useMemo(() => {
+    if (!post?.comments) return [];
+    
+    // Remove duplicates by ID
+    const uniqueComments = post.comments.filter((comment, index, self) => 
+      self.findIndex(c => c.id === comment.id) === index
+    );
+    
+    // Sort chronologically (oldest first)
+    return uniqueComments.sort((a, b) => 
+      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+  }, [post?.comments]);
+
   useEffect(() => {
     if (params.id) {
       fetchPost();
@@ -143,72 +204,123 @@ export default function BlogPostPage() {
   // Real-time WebSocket setup
   useEffect(() => {
     if (user && params.id) {
-      // Check connection status
-      setIsConnected(socketService.isConnectedToServer());
+      const token = localStorage.getItem("token");
+      if (token) {
+        console.log(`📖 Blog Post: Setting up WebSocket connection for post ${params.id}`);
+        
+        // Ensure WebSocket connection
+        socketService.connect(token);
+        
+        // Join both blog room and specific post room for comprehensive updates
+        socketService.joinBlogRoom();
+        socketService.joinPostRoom(params.id as string);
 
-      // Join post room for real-time updates
-      socketService.joinPostRoom(params.id as string);
+        // Set up real-time event listeners
+        const handlePostLike = (data: {
+          postId: string;
+          likesCount: number;
+          isLiked: boolean;
+          userId?: string;
+        }) => {
+          console.log("📖 Blog Post: Like event received", data);
+          if (data.postId === params.id) {
+            setPost((prevPost) => {
+              if (!prevPost) return prevPost;
+              return {
+                ...prevPost,
+                likesCount: data.likesCount,
+                isLiked: data.userId === user.id ? data.isLiked : prevPost.isLiked,
+              };
+            });
 
-      // Set up real-time event listeners
-      const handlePostLike = (data: {
-        postId: string;
-        likesCount: number;
-        isLiked: boolean;
-      }) => {
-        if (data.postId === params.id) {
-          setPost((prevPost) => {
-            if (!prevPost) return prevPost;
-            return {
-              ...prevPost,
-              likesCount: data.likesCount,
-              isLiked: data.isLiked,
-            };
-          });
-        }
-      };
-
-      const handleNewComment = (comment: any) => {
-        if (comment.postId === params.id) {
-          setPost((prevPost) => {
-            if (!prevPost) return prevPost;
-            
-            // Check if comment already exists to prevent duplicates
-            const existingComments = prevPost.comments || [];
-            const commentExists = existingComments.some(existingComment => existingComment.id === comment.id);
-            
-            if (commentExists) {
-              return prevPost; // Don't add duplicate comment
+            // Show notification only if it's not the current user's action
+            if (data.userId && data.userId !== user.id) {
+              setRealtimeUpdates(prev => prev + 1);
+              toast({
+                title: "🔥 リアルタイム更新",
+                description: `この投稿に${data.isLiked ? 'いいね' : 'いいね取り消し'}がありました！`,
+              });
             }
+          }
+        };
 
-            return {
-              ...prevPost,
-              commentsCount: prevPost.commentsCount + 1,
-              comments: [...existingComments, comment],
-            };
-          });
+        const handleNewComment = (comment: any) => {
+          console.log("📖 Blog Post: New comment received", comment);
+          if (comment.postId === params.id) {
+            setPost((prevPost) => {
+              if (!prevPost) return prevPost;
+              
+              // Check if comment already exists to prevent duplicates
+              const existingComments = prevPost.comments || [];
+              const commentExists = existingComments.some(existingComment => existingComment.id === comment.id);
+              
+              if (commentExists) {
+                console.log("📖 Blog Post: Duplicate comment detected, skipping");
+                return prevPost; // Don't add duplicate comment
+              }
 
-          toast({
-            title: "新しいコメント",
-            description: `${comment.author.nickname}さんがコメントしました`,
-          });
-        }
-      };
+              console.log("📖 Blog Post: Adding new comment to state");
+              return {
+                ...prevPost,
+                comments: [...existingComments, comment],
+              };
+            });
 
-      socketService.onPostLike(handlePostLike);
-      socketService.onNewComment(handleNewComment);
+            // Show notification only if it's not the current user's comment
+            if (comment.author.id !== user.id) {
+              setRealtimeUpdates(prev => prev + 1);
+              toast({
+                title: "💬 新しいコメント",
+                description: `${comment.author.nickname}さんがコメントしました`,
+              });
+            }
+          }
+        };
 
-      // Update connection status
-      const checkConnection = () => {
-        setIsConnected(socketService.isConnectedToServer());
-      };
-      const connectionInterval = setInterval(checkConnection, 5000);
+        const handlePostUpdate = (updatedPost: any) => {
+          console.log("📖 Blog Post: Post update received", updatedPost);
+          if (updatedPost.id === params.id) {
+            setPost((prevPost) => {
+              if (!prevPost) return prevPost;
+              return {
+                ...prevPost,
+                ...updatedPost,
+                comments: prevPost.comments, // Preserve existing comments
+              };
+            });
 
-      return () => {
-        socketService.leavePostRoom(params.id as string);
-        socketService.offPostLike(handlePostLike);
-        socketService.offNewComment(handleNewComment);
-        clearInterval(connectionInterval);
-      };
+            setRealtimeUpdates(prev => prev + 1);
+            toast({
+              title: "📝 投稿が更新されました",
+              description: "この投稿の内容が更新されました",
+            });
+          }
+        };
+
+        socketService.onPostLike(handlePostLike);
+        socketService.onNewComment(handleNewComment);
+        socketService.onPostUpdate(handlePostUpdate);
+
+        // Update connection status
+        const checkConnection = () => {
+          const connected = socketService.isConnectedToServer();
+          setIsConnected(connected);
+          if (!connected) {
+            console.log("📖 Blog Post: WebSocket disconnected, attempting reconnect...");
+          }
+        };
+        const connectionInterval = setInterval(checkConnection, 1000);
+
+        return () => {
+          console.log(`📖 Blog Post: Cleaning up WebSocket for post ${params.id}`);
+          socketService.leaveBlogRoom();
+          socketService.leavePostRoom(params.id as string);
+          socketService.offPostLike(handlePostLike);
+          socketService.offNewComment(handleNewComment);
+          socketService.offPostUpdate(handlePostUpdate);
+          clearInterval(connectionInterval);
+        };
+      }
     }
   }, [user, params.id, toast]);
 
@@ -243,14 +355,23 @@ export default function BlogPostPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Back Button */}
-      <div className="mb-6">
+      {/* Back Button & Real-time Status */}
+      <div className="mb-6 flex items-center justify-between">
         <Link href="/blogs">
           <Button variant="ghost" className="text-pink-600 hover:text-pink-700">
             <ArrowLeft className="w-4 h-4 mr-2" />
             ブログ一覧に戻る
           </Button>
         </Link>
+        
+        {user && isConnected && realtimeUpdates > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800">
+            <span className="flex items-center">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+              リアルタイム更新 ({realtimeUpdates}回)
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Post Content */}
@@ -281,12 +402,17 @@ export default function BlogPostPage() {
                 {isConnected ? (
                   <div className="flex items-center text-green-600">
                     <Wifi className="w-3 h-3 mr-1" />
-                    <span className="text-xs">リアルタイム</span>
+                    <span className="text-xs">リアルタイム接続中</span>
+                    {realtimeUpdates > 0 && (
+                      <span className="ml-1 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                        +{realtimeUpdates}
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center text-red-600">
                     <WifiOff className="w-3 h-3 mr-1" />
-                    <span className="text-xs">接続なし</span>
+                    <span className="text-xs">オフライン</span>
                   </div>
                 )}
               </div>
@@ -329,42 +455,62 @@ export default function BlogPostPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">
-            コメント ({post.commentsCount})
+            コメント ({processedComments.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {post.comments && post.comments.length > 0 ? (
+          {processedComments.length > 0 ? (
             <div className="space-y-4">
-              {post.comments
-                .filter((comment, index, self) => 
-                  self.findIndex(c => c.id === comment.id) === index
-                )
-                .map((comment, index) => (
-                <div
-                  key={`comment-${comment.id}-${index}`}
-                  className="border-b border-gray-100 pb-4 last:border-b-0"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-900">
-                      {comment.author.nickname}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {formatDate(comment.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-gray-700">{comment.content}</p>
-                </div>
-              ))}
+              {processedComments.map((comment) => {
+                // Safe rendering with fallback for malformed comments
+                try {
+                  return (
+                    <div
+                      key={comment.id}
+                      className="border-b border-gray-100 pb-4 last:border-b-0 animate-in fade-in-50 duration-300"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-gray-900 flex items-center">
+                          <User className="w-4 h-4 mr-1 text-gray-500" />
+                          {comment.author?.nickname || "匿名ユーザー"}
+                        </span>
+                        <span className="text-sm text-gray-500 flex items-center">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {formatDate(comment.createdAt)}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 ml-5">{comment.content}</p>
+                    </div>
+                  );
+                } catch (error) {
+                  console.error("Error rendering comment:", error, comment);
+                  return (
+                    <div
+                      key={comment.id || `error-${Math.random()}`}
+                      className="border-b border-gray-100 pb-4 last:border-b-0 text-red-500 text-sm italic"
+                    >
+                      コメントの表示でエラーが発生しました
+                    </div>
+                  );
+                }
+              })}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">
-              まだコメントがありません。
-            </p>
+            <div className="text-center py-8">
+              <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">まだコメントがありません。</p>
+              <p className="text-sm text-gray-400 mt-2">
+                最初のコメントを投稿して議論を始めましょう！
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
       {/* Comment Form */}
-      <CommentForm postId={params.id as string} />
+      <CommentForm 
+        postId={params.id as string} 
+        onCommentAdded={handleCommentAdded}
+      />
     </div>
   );
 }

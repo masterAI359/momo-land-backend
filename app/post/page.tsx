@@ -29,15 +29,24 @@ export default function PostPage() {
 
   const categories = ["初心者向け", "上級者向け", "おすすめ", "レビュー"]
 
-  // Check WebSocket connection status
+  // WebSocket connection setup
   useEffect(() => {
     if (user) {
-      setIsConnected(socketService.isConnectedToServer())
-      const checkConnection = () => {
-        setIsConnected(socketService.isConnectedToServer())
+      const token = localStorage.getItem("token")
+      if (token) {
+        console.log("📝 Post page: Setting up WebSocket connection")
+        socketService.connect(token)
+        
+        // Update connection status
+        const checkConnection = () => {
+          setIsConnected(socketService.isConnectedToServer())
+        }
+        const connectionInterval = setInterval(checkConnection, 1000)
+        
+        return () => {
+          clearInterval(connectionInterval)
+        }
       }
-      const connectionInterval = setInterval(checkConnection, 5000)
-      return () => clearInterval(connectionInterval)
     }
   }, [user])
 
@@ -58,20 +67,56 @@ export default function PostPage() {
       return
     }
 
+    if (content.trim().length < 10) {
+      toast({
+        title: "入力エラー",
+        description: "内容は10文字以上で入力してください。",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (title.trim().length > 200) {
+      toast({
+        title: "入力エラー",
+        description: "タイトルは200文字以内で入力してください。",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsSubmitting(true)
 
     try {
-      const response = await api.post("/posts", {
+      // Check if user has valid token
+      const token = localStorage.getItem("token")
+      if (!token) {
+        toast({
+          title: "認証エラー",
+          description: "ログイン情報が見つかりません。再度ログインしてください。",
+          variant: "destructive",
+        })
+        setShowLoginModal(true)
+        return
+      }
+
+      const postData = {
         title: title.trim(),
         content: content.trim(),
-        category,
-      })
+        category: category,
+        excerpt: content.trim().substring(0, 200) + (content.trim().length > 200 ? "..." : "")
+      }
 
-      console.log("response =================", response)
+      console.log("📝 Sending post data:", postData)
+      console.log("🔑 Token available:", token ? "Yes" : "No")
+      
+      const response = await api.post("/posts", postData)
+
+      console.log("✅ Post created successfully:", response.data)
       
       toast({
         title: "投稿完了",
-        description: "体験記が正常に投稿されました！",
+        description: "体験記が正常に投稿されました！リアルタイムで他のユーザーに表示されます。",
       })
 
       // Clear form after successful submission
@@ -79,13 +124,41 @@ export default function PostPage() {
       setContent("")
       setCategory("初心者向け")
       
-      // Optionally redirect to the new post
-      // router.push(`/blogs/${response.data.post.id}`)
+      // Show success message with real-time info
+      if (isConnected) {
+        toast({
+          title: "🚀 リアルタイム配信中",
+          description: "あなたの投稿が他のユーザーにリアルタイムで表示されました！",
+        })
+      }
+      
+      // Redirect to the new post after a short delay
+      setTimeout(() => {
+        if (response.data.post?.id) {
+          router.push(`/blogs/${response.data.post.id}`)
+        }
+      }, 2000)
     } catch (error: any) {
-      console.error("Post creation error:", error)
+      console.error("❌ Post creation error:", error)
+      console.error("Error details:", error.response?.data)
+      
+      let errorMessage = "投稿に失敗しました。もう一度お試しください。"
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.response?.data?.details) {
+        // Handle validation errors
+        const validationErrors = error.response.data.details
+        errorMessage = validationErrors.map((err: any) => err.msg).join(", ")
+      } else if (error.response?.status === 401) {
+        errorMessage = "認証エラーです。ログインし直してください。"
+      } else if (error.response?.status === 400) {
+        errorMessage = "入力データに問題があります。内容を確認してください。"
+      }
+      
       toast({
         title: "投稿エラー",
-        description: error.response?.data?.error || "投稿に失敗しました。もう一度お試しください。",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -150,7 +223,7 @@ export default function PostPage() {
               {/* Title */}
               <div>
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                  タイトル *
+                  タイトル * <span className="text-xs text-gray-500">(1-200文字)</span>
                 </label>
                 <Input
                   id="title"
@@ -158,10 +231,12 @@ export default function PostPage() {
                   placeholder="体験記のタイトルを入力してください"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full"
-                  maxLength={100}
+                  className={`w-full ${title.length > 200 ? 'border-red-500' : ''}`}
+                  maxLength={200}
                 />
-                <p className="text-xs text-gray-500 mt-1">{title.length}/100文字</p>
+                <p className={`text-xs mt-1 ${title.length > 200 ? 'text-red-500' : 'text-gray-500'}`}>
+                  {title.length}/200文字
+                </p>
               </div>
 
               {/* Category */}
@@ -185,7 +260,7 @@ export default function PostPage() {
               {/* Content */}
               <div>
                 <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-                  体験記の内容 *
+                  体験記の内容 * <span className="text-xs text-gray-500">(10文字以上)</span>
                 </label>
                 <Textarea
                   id="content"
@@ -193,9 +268,11 @@ export default function PostPage() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={12}
-                  className="w-full"
+                  className={`w-full ${content.trim().length > 0 && content.trim().length < 10 ? 'border-red-500' : ''}`}
                 />
-                <p className="text-xs text-gray-500 mt-1">{content.length}文字</p>
+                <p className={`text-xs mt-1 ${content.trim().length > 0 && content.trim().length < 10 ? 'text-red-500' : 'text-gray-500'}`}>
+                  {content.length}文字 {content.trim().length > 0 && content.trim().length < 10 ? '(10文字以上必要)' : ''}
+                </p>
               </div>
 
               {/* Guidelines */}
@@ -214,7 +291,7 @@ export default function PostPage() {
               <div className="flex space-x-4">
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !title.trim() || !content.trim()}
+                  disabled={isSubmitting || !title.trim() || !content.trim() || content.trim().length < 10 || title.trim().length > 200}
                   className="flex-1 bg-pink-600 hover:bg-pink-700"
                 >
                   {isSubmitting ? (
@@ -245,6 +322,19 @@ export default function PostPage() {
                   プレビュー
                 </Button>
               </div>
+              
+              {/* Debug Info */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>Token: {typeof window !== 'undefined' && localStorage.getItem("token") ? "Available" : "Missing"}</p>
+                  <p>WebSocket: {isConnected ? "Connected" : "Disconnected"}</p>
+                  <p>Title length: {title.trim().length}/200</p>
+                  <p>Content length: {content.trim().length} (min: 10)</p>
+                  <p>Category: {category}</p>
+                  <p>User: {user?.nickname || "Not logged in"}</p>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>

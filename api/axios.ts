@@ -1,57 +1,53 @@
 import axios from "axios"
 
+// Build API URL ensuring it includes /api path
+const getApiUrl = () => {
+  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3001"
+  
+  // If serverUrl already includes /api, use it as is
+  if (serverUrl.includes('/api')) {
+    return serverUrl
+  }
+  
+  // Otherwise, append /api to the base URL
+  return `${serverUrl}/api`
+}
+
 const api = axios.create({
-  baseURL: process.env.SERVER_URL || "http://localhost:3001/api",
-  timeout: 10000, // 10 second timeout
+  baseURL: getApiUrl(),
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 10000, // 10 second timeout
 })
 
-// Add request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
-    console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`)
-    
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem("token")
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
     }
+    console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`)
     return config
   },
   (error) => {
-    console.error("🚨 API Request Error:", error)
+    console.error("❌ API Request Error:", error)
     return Promise.reject(error)
   }
 )
 
-// Add response interceptor for debugging
 api.interceptors.response.use(
   (response) => {
     console.log(`✅ API Response: ${response.status} ${response.config.method?.toUpperCase()} ${response.config.url}`)
     return response
   },
   (error) => {
-    console.error(`❌ API Response Error:`, {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      message: error.message,
-      code: error.code
-    })
-    
-    // Add additional debugging for network errors
-    if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
-      console.error("🔍 Network Error Details:", {
-        baseURL: error.config?.baseURL,
-        fullURL: `${error.config?.baseURL}${error.config?.url}`,
-        timeout: error.config?.timeout,
-        method: error.config?.method
-      })
+    console.error("❌ API Response Error:", error)
+    if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      console.error("🚨 Backend server appears to be unreachable")
     }
-    
     return Promise.reject(error)
   }
 )
