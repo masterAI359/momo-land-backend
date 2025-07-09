@@ -47,7 +47,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <AffiliateBanner size="large" position="header" />
+      <AffiliateBanner size="large" position="header" src="/images/banner/800_250.jpg" alt="Affiliate Banner" link="" />
 
       {/* Features Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -139,7 +139,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <AffiliateBanner size="medium" position="content" />
+      <AffiliateBanner size="medium" position="content" src="" link="" alt="Affiliate Banner" />
 
       {/* Recent Posts Preview */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -210,7 +210,7 @@ export default function BlogsPage() {
             </p>
           </div>
 
-          <AffiliateBanner size="large" position="content" />
+          <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" />
 
           {/* Blog Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -287,7 +287,7 @@ export default function BlogsPage() {
         {/* Sidebar */}
         <div className="lg:w-80">
           <div className="sticky top-4 space-y-6">
-            <AffiliateBanner size="small" position="sidebar" />
+            <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="small" position="sidebar" />
 
             <Card>
               <CardHeader>

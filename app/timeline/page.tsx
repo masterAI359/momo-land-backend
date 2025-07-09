@@ -247,7 +247,7 @@ export default function TimelinePage() {
           </p>
         </div>
 
-        <AffiliateBanner size="large" position="content" />
+        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" />
 
         {/* Error Message */}
         {error && (
@@ -345,7 +345,7 @@ export default function TimelinePage() {
           </div>
         )}
 
-        <AffiliateBanner size="medium" position="content" />
+        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="medium" position="content" />
 
         {/* Load More Button */}
         {!loading && hasMore && (
