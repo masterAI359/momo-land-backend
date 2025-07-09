@@ -9,6 +9,17 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  headers: async () => [
+    {
+      source: "/(.*)",
+      headers: [
+        {
+          key: "Referrer-Policy",
+          value: "no-referrer",
+        },
+      ],
+    },
+  ],
 }
 
 export default nextConfig

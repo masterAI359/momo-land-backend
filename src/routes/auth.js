@@ -23,6 +23,7 @@ router.post(
   ],
   async (req, res) => {
     try {
+      console.log(req.body)
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -120,7 +121,7 @@ router.post(
 
       if (!user) {
         return res.status(401).json({
-          error: "Invalid email or password",
+          error: "無効なメールアドレスまたはパスワードです。",
         });
       }
   
@@ -129,7 +130,7 @@ router.post(
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
           return res.status(401).json({
-            error: "Invalid email or password",
+            error: "無効なメールアドレスまたはパスワードです。",
           });
         }
       }
