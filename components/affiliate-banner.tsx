@@ -18,7 +18,7 @@ export default function AffiliateBanner({ size, position, src, alt, link }: Affi
   const bannerConfig = {
     large: { width: 800, height: 250 },
     medium: { width: 580, height: 75 },
-    small: { width: 400, height: 400 },
+    small: { width: 300, height: 300 },
   }
 
   const config = bannerConfig[size]
@@ -27,7 +27,7 @@ export default function AffiliateBanner({ size, position, src, alt, link }: Affi
     <div className={`flex justify-center my-4 ${position === "sidebar" ? "sticky top-4" : ""}`}>
       <div className="bg-gray-100 border border-gray-200 rounded-lg">
         <div
-          className="bg-pink-100 border-2 border-dashed border-pink-300 rounded flex items-center justify-center text-pink-600 relative"
+          className="bg-pink-100 border-1 border-dashed border-pink-200 rounded flex items-center justify-center text-pink-600 relative"
           style={{ width: config.width, height: config.height }}
         >
           {isLoading && (
@@ -46,7 +46,7 @@ export default function AffiliateBanner({ size, position, src, alt, link }: Affi
                   alt={alt}
                   width={config.width}
                   height={config.height}
-                  className={`w-full h-full object-cover hover:opacity-80 transition-opacity duration-300 scale-105 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                  className={`w-full h-full object-cover hover:opacity-80 hover:rotate-2 hover:scale-105 transition-all duration-300 rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                   onLoad={() => setIsLoading(false)}
                   onError={() => setIsLoading(false)}
                 />
@@ -57,7 +57,7 @@ export default function AffiliateBanner({ size, position, src, alt, link }: Affi
                 alt={alt}
                 width={config.width}
                 height={config.height}
-                className={`w-full h-full object-cover hover:opacity-80 transition-opacity duration-300 scale-105 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                className={`w-full h-full object-cover hover:opacity-80 hover:rotate-2 hover:scale-105 transition-all duration-300 rounded-lg ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                 onLoad={() => setIsLoading(false)}
                 onError={() => setIsLoading(false)}
               />
