@@ -19,21 +19,14 @@ const app = express()
 const server = createServer(app)
 const io = new Server(server, {
   cors: {
-    // origin: process.env.FRONTEND_URL || "http://localhost:3000",
     origin: "*",
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   },
 })
 
 // Middleware
 app.use(helmet())
-app.use(
-  cors({
-    // origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    origin: "*",
-    credentials: true,
-  }),
-)
+app.use(cors())
 app.use(morgan("combined"))
 app.use(express.json({ limit: "10mb" }))
 app.use(express.urlencoded({ extended: true }))

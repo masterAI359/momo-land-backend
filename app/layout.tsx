@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
     type: "website",
   },
-    generator: 'v0.dev'
+    generator: 'angel'
 }
 
 export default function RootLayout({
@@ -35,7 +35,7 @@ export default function RootLayout({
         <AuthProvider>
           <div className="min-h-screen flex flex-col bg-gray-50">
             <Header />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1 pb-16">{children}</main>
             <Footer />
           </div>
           <Toaster />

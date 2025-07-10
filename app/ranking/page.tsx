@@ -241,7 +241,7 @@ export default function RankingPage() {
         </div>
 
         {/* Affiliate Banner */}
-        <AffiliateBanner size="large" position="header" />
+        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="header" />
 
         {/* Content */}
         {loading ? (
@@ -322,7 +322,7 @@ export default function RankingPage() {
         )}
 
         {/* Affiliate Banner */}
-        <AffiliateBanner size="medium" position="content" />
+        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="medium" position="content" />
       </div>
     </div>
   )

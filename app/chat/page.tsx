@@ -256,7 +256,7 @@ export default function GroupChatPage() {
           </p>
         </div>
 
-        <AffiliateBanner size="large" position="content" />
+        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" />
 
         {/* Create Room Section */}
         <Card className="bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200">
@@ -386,7 +386,7 @@ export default function GroupChatPage() {
           )}
         </div>
 
-        <AffiliateBanner size="medium" position="content" />
+        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="medium" position="content" />
 
         {/* Instructions */}
         <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">

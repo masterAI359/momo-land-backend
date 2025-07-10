@@ -17,12 +17,10 @@ class SocketService {
 
     // Socket.IO connects to the root server URL, not the /api endpoint
     let serverUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
-                   process.env.NEXT_PUBLIC_SERVER_URL || 
-                   "http://localhost:3001"
-    
+                   "http://160.251.205.55"
     // Remove /api suffix if present (Socket.IO runs on root path)
-    if (serverUrl.endsWith('/api')) {
-      serverUrl = serverUrl.replace('/api', '')
+    if (serverUrl.endsWith('/socket.io')) {
+      serverUrl = serverUrl.replace('/socket.io', '')
     }
     
     console.log("🔌 Connecting to WebSocket server:", serverUrl)
