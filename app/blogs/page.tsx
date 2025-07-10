@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { MessageSquare, Heart, Clock, Wifi, WifiOff } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
@@ -50,6 +51,8 @@ export default function BlogsPage() {
     pages: 1
   })
   const [isConnected, setIsConnected] = useState(false)
+  const [iframeLargeLoading, setIframeLargeLoading] = useState(true)
+  const [iframeSidebarLoading, setIframeSidebarLoading] = useState(true)
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -155,9 +158,90 @@ export default function BlogsPage() {
   if (loading && posts.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">投稿を読み込み中...</p>
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Main Content Skeleton */}
+          <div className="flex-1">
+            <div className="mb-8">
+              <Skeleton className="h-8 w-48 mb-4" />
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </div>
+
+            {/* Banner Skeleton */}
+            <Skeleton className="w-full h-[273px] mb-6 bg-pink-100 border-2 border-dashed border-pink-300 rounded flex items-center justify-center">
+              <div className="flex flex-col items-center space-y-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+                <p className="text-sm text-pink-600 font-medium">読み込み中...</p>
+              </div>
+            </Skeleton>
+
+            {/* Blog Grid Skeleton */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <Skeleton className="h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-3/4 mb-4" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-4 w-8" />
+                        <Skeleton className="h-4 w-8" />
+                      </div>
+                      <Skeleton className="h-8 w-20" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Sidebar Skeleton */}
+          <div className="lg:w-80">
+            <div className="sticky top-4 space-y-6">
+              {/* Banner Skeleton */}
+              <Skeleton className="w-full h-[300px] bg-pink-100 border-2 border-dashed border-pink-300 rounded" />
+              
+              {/* Popular Posts Skeleton */}
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-24" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="border-b border-gray-100 pb-3 last:border-b-0">
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="h-3 w-8" />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Categories Skeleton */}
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-20" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {[...Array(4)].map((_, i) => (
+                      <Skeleton key={i} className="h-8 w-full" />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -212,13 +296,28 @@ export default function BlogsPage() {
 
           {/* <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" /> */}
           <div className="w-full overflow-hidden mb-6">
-            <iframe 
-              className="border-dashed border-pink-300 rounded w-full h-auto max-w-full" 
-              src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=844&count=5&pid=MLA5563&hd_flg=0&v=0&clr=e8ffef&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=5&seika=10000' 
-              width='844' 
-              height='273'
-              style={{ minHeight: '200px', aspectRatio: '844/273' }}
-            ></iframe>
+            <div className="relative">
+              {iframeLargeLoading && (
+                <div className="absolute inset-0 z-10">
+                  <Skeleton className="w-full h-[273px] bg-pink-100 border-2 border-dashed border-pink-300 rounded flex items-center justify-center">
+                    <div className="flex flex-col items-center space-y-3">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+                      <p className="text-sm text-pink-600 font-medium">バナーを読み込み中...</p>
+                    </div>
+                  </Skeleton>
+                </div>
+              )}
+              <iframe 
+                className={`border-dashed border-pink-300 rounded w-full h-auto max-w-full transition-opacity duration-300 ${iframeLargeLoading ? 'opacity-0' : 'opacity-100'}`}
+                src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=844&count=5&pid=MLA5563&hd_flg=0&v=0&clr=e8ffef&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=5&seika=10000' 
+                width='844' 
+                height='273'
+                style={{ minHeight: '275px', aspectRatio: '844/273' }}
+                onLoad={() => {
+                  setTimeout(() => setIframeLargeLoading(false), 500)
+                }}
+              ></iframe>
+            </div>
           </div>
 
           {/* Blog Grid */}
@@ -296,16 +395,33 @@ export default function BlogsPage() {
         {/* Sidebar */}
         <div className="lg:w-80">
           <div className="sticky top-4 space-y-6">
-            {/* <AffiliateBanner src="https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=180&count=1&pid=MLA5563&hd_flg=0&v=0&clr=ffffff&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=1&seika=10000" alt="Affiliate Banner" size="small" position="sidebar" /> */}
-            <div className="w-full overflow-hidden mb-6">
-              <iframe 
-                className="sticky top-4 border-dashed border-pink-300 rounded w-full h-auto max-w-full" 
-                src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=180&count=1&pid=MLA5563&hd_flg=0&v=0&clr=ffffff&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=1&seika=10000' 
-                width='180' 
-                height='275'
-                style={{ minHeight: '200px', aspectRatio: '180/275' }}
-              ></iframe>
-            </div>
+            <AffiliateBanner src="/images/banner/625_610.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="small" position="sidebar" />
+            
+            {/* Alternative Sidebar Banner with Loading State */}
+            {/* <div className="w-full overflow-hidden mb-6">
+              <div className="relative">
+                {iframeSidebarLoading && (
+                  <div className="absolute inset-0 z-10">
+                    <Skeleton className="sticky top-4 w-full h-[275px] bg-pink-100 border-2 border-dashed border-pink-300 rounded flex items-center justify-center">
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-500"></div>
+                        <p className="text-xs text-pink-600 font-medium">読み込み中...</p>
+                      </div>
+                    </Skeleton>
+                  </div>
+                )}
+                <iframe 
+                  className={`sticky top-4 border-dashed border-pink-300 rounded w-full h-auto max-w-full transition-opacity duration-300 ${iframeSidebarLoading ? 'opacity-0' : 'opacity-100'}`}
+                  src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=180&count=1&pid=MLA5563&hd_flg=0&v=0&clr=ffffff&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=1&seika=10000' 
+                  width='180' 
+                  height='275'
+                  style={{ minHeight: '275px', aspectRatio: '180/275' }}
+                  onLoad={() => {
+                    setTimeout(() => setIframeSidebarLoading(false), 500)
+                  }}
+                ></iframe>
+              </div>
+            </div> */}
 
             <Card>
               <CardHeader>
