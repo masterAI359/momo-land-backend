@@ -28,7 +28,7 @@ export default function AffiliateBanner({ size, position, src, alt, link }: Affi
       <div className="bg-gray-100 border border-gray-200 rounded-lg">
         <div
           className="bg-pink-100 border-1 border-dashed border-pink-200 rounded flex items-center justify-center text-pink-600 relative"
-          style={{ width: config.width, height: config.height }}
+          // style={{ width: config.width, height: config.height }}
         >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-pink-50 rounded">

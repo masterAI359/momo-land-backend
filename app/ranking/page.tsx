@@ -322,7 +322,7 @@ export default function RankingPage() {
         )}
 
         {/* Affiliate Banner */}
-        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="medium" position="content" />
+        <AffiliateBanner src="/images/banner/ranking_footer.jpg" alt="Affiliate Banner" link="/" size="medium" position="content" />
       </div>
     </div>
   )

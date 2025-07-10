@@ -1,12 +1,68 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { MessageSquare, Clock, Users, TrendingUp } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { MessageSquare, Clock, Users, TrendingUp, Heart } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
 import FeatureCard from "@/components/feature-card"
+import api from "@/api/axios"
+
+interface Post {
+  id: string
+  title: string
+  content: string
+  category: string
+  excerpt: string
+  author: {
+    id: string
+    nickname: string
+  }
+  likesCount: number
+  commentsCount: number
+  createdAt: string
+}
 
 export default function HomePage() {
+  const [recentPosts, setRecentPosts] = useState<Post[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchRecentPosts = async () => {
+      try {
+        setLoading(true)
+        const response = await api.get('/posts?limit=3&sortBy=createdAt')
+        setRecentPosts(response.data.posts)
+        setError(null)
+      } catch (error: any) {
+        console.error("Failed to fetch recent posts:", error)
+        setError("最新の投稿を取得できませんでした。")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRecentPosts()
+  }, [])
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    
+    if (diffInHours < 1) {
+      return "1時間未満前"
+    } else if (diffInHours < 24) {
+      return `${diffInHours}時間前`
+    } else {
+      const diffInDays = Math.floor(diffInHours / 24)
+      return `${diffInDays}日前`
+    }
+  }
   return (
     <div className="space-y-8">
       {/* Hero Section */}
@@ -47,7 +103,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <AffiliateBanner size="large" position="header" src="/images/banner/800_250.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" />
+      <AffiliateBanner size="large" position="header" src="/images/banner/main_header.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" />
 
       {/* Features Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -139,7 +195,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <AffiliateBanner size="medium" position="content" src="/images/banner/580_75.jpg" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" alt="Affiliate Banner" />
+      <AffiliateBanner size="medium" position="content" src="/images/banner/main_footer.jpg" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" alt="Affiliate Banner" />
 
       {/* Recent Posts Preview */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -149,23 +205,94 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle className="text-lg">サンプル体験記 {i}</CardTitle>
-                <CardDescription>投稿者: ユーザー{i} • 2時間前</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 text-sm mb-4">
-                  ライブチャットでの体験について詳しく書かれた投稿です。 実際の体験談や感想が含まれています...
-                </p>
-                <div className="flex items-center justify-between text-sm text-gray-500">
-                  <span>❤️ {i * 5} いいね</span>
-                  <span>💬 {i * 2} コメント</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {loading ? (
+            // Loading skeletons
+            [...Array(3)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader>
+                  <div className="flex items-center justify-between mb-2">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                  <Skeleton className="h-6 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-3/4 mb-4" />
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-4 w-12" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : error ? (
+            // Error state
+            <div className="col-span-full text-center py-8">
+              <p className="text-red-600 mb-4">{error}</p>
+              <Button onClick={() => window.location.reload()} variant="outline">
+                再読み込み
+              </Button>
+            </div>
+          ) : recentPosts.length > 0 ? (
+            // Real posts from API
+            recentPosts.map((post) => (
+              <Link key={post.id} href={`/blogs/${post.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs bg-pink-100 text-pink-800 px-2 py-1 rounded-full">
+                        {post.category}
+                      </span>
+                      <span className="text-xs text-gray-500 flex items-center">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {formatDate(post.createdAt)}
+                      </span>
+                    </div>
+                    <CardTitle className="text-lg hover:text-pink-600 transition-colors line-clamp-2">
+                      {post.title}
+                    </CardTitle>
+                    <CardDescription>投稿者: {post.author.nickname}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                      {post.excerpt}
+                    </p>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <div className="flex items-center space-x-4">
+                        <span className="flex items-center">
+                          <Heart className="w-4 h-4 mr-1 text-red-500" />
+                          {post.likesCount}
+                        </span>
+                        <span className="flex items-center">
+                          <MessageSquare className="w-4 h-4 mr-1 text-blue-500" />
+                          {post.commentsCount}
+                        </span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-pink-600 hover:text-pink-700 p-0">
+                        続きを読む →
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))
+          ) : (
+            // No posts state
+            <div className="col-span-full text-center py-8">
+              <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 mb-4">まだ投稿がありません</p>
+              <FeatureCard
+                icon={<MessageSquare className="w-4 h-4 mr-2" />}
+                title="最初の投稿をする"
+                href="/post"
+                requiresAuth={true}
+                isButton={true}
+                buttonClass="bg-pink-600 hover:bg-pink-700"
+              />
+            </div>
+          )}
         </div>
 
         <div className="text-center">
