@@ -247,7 +247,7 @@ export default function TimelinePage() {
           </p>
         </div>
 
-        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" />
+        <AffiliateBanner src="/images/banner/timeline_header.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="large" position="content" />
 
         {/* Error Message */}
         {error && (
@@ -345,7 +345,7 @@ export default function TimelinePage() {
           </div>
         )}
 
-        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="medium" position="content" />
+        <AffiliateBanner src="/images/banner/timeline_footer.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="medium" position="content" />
 
         {/* Load More Button */}
         {!loading && hasMore && (
