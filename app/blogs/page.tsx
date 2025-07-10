@@ -210,7 +210,16 @@ export default function BlogsPage() {
             </p>
           </div>
 
-          <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" />
+          {/* <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" /> */}
+          <div className="w-full overflow-hidden mb-6">
+            <iframe 
+              className="border-dashed border-pink-300 rounded w-full h-auto max-w-full" 
+              src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=844&count=5&pid=MLA5563&hd_flg=0&v=0&clr=e8ffef&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=5&seika=10000' 
+              width='844' 
+              height='273'
+              style={{ minHeight: '200px', aspectRatio: '844/273' }}
+            ></iframe>
+          </div>
 
           {/* Blog Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -287,7 +296,16 @@ export default function BlogsPage() {
         {/* Sidebar */}
         <div className="lg:w-80">
           <div className="sticky top-4 space-y-6">
-            <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="small" position="sidebar" />
+            {/* <AffiliateBanner src="https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=180&count=1&pid=MLA5563&hd_flg=0&v=0&clr=ffffff&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=1&seika=10000" alt="Affiliate Banner" size="small" position="sidebar" /> */}
+            <div className="w-full overflow-hidden mb-6">
+              <iframe 
+                className="sticky top-4 border-dashed border-pink-300 rounded w-full h-auto max-w-full" 
+                src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=180&count=1&pid=MLA5563&hd_flg=0&v=0&clr=ffffff&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=1&seika=10000' 
+                width='180' 
+                height='275'
+                style={{ minHeight: '200px', aspectRatio: '180/275' }}
+              ></iframe>
+            </div>
 
             <Card>
               <CardHeader>
