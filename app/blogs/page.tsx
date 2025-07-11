@@ -294,7 +294,7 @@ export default function BlogsPage() {
             </p>
           </div>
 
-          {/* <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" /> */}
+          {/* <AffiliateBanner src="/images/affiliate/timeline_header.png" alt="Affiliate Banner" link="" size="large" position="content" /> */}
           <div className="w-full overflow-hidden mb-6">
             <div className="relative">
               {iframeLargeLoading && (
