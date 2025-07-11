@@ -241,7 +241,7 @@ export default function RankingPage() {
         </div>
 
         {/* Affiliate Banner */}
-        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="header" />
+        <AffiliateBanner src="/images/banner/timeline_header.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="large" position="header" />
 
         {/* Content */}
         {loading ? (
@@ -322,7 +322,7 @@ export default function RankingPage() {
         )}
 
         {/* Affiliate Banner */}
-        <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="medium" position="content" />
+        <AffiliateBanner src="/images/banner/ranking_footer.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="medium" position="content" />
       </div>
     </div>
   )

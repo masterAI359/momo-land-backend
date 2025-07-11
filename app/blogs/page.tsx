@@ -395,7 +395,7 @@ export default function BlogsPage() {
         {/* Sidebar */}
         <div className="lg:w-80">
           <div className="sticky top-4 space-y-6">
-            <AffiliateBanner src="/images/banner/625_610.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="small" position="sidebar" />
+            <AffiliateBanner src="/images/banner/blogs_sidebar.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="small" position="sidebar" />
             
             {/* Alternative Sidebar Banner with Loading State */}
             {/* <div className="w-full overflow-hidden mb-6">

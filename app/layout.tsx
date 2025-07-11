@@ -13,12 +13,13 @@ export const metadata: Metadata = {
   title: "momoLand - ライブチャット体験記共有サイト",
   description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
   keywords: "ライブチャット, 体験記, 口コミ, レビュー, コミュニティ",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   openGraph: {
     title: "momoLand - ライブチャット体験記共有サイト",
     description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
     type: "website",
   },
-    generator: 'angel'
+  generator: 'angel'
 }
 
 export default function RootLayout({
