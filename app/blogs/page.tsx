@@ -61,7 +61,7 @@ export default function BlogsPage() {
       setLoading(true)
       const response = await api.get(`/posts?page=${page}&limit=10&sortBy=createdAt`)
       const data: PostsResponse = response.data
-      
+
       setPosts(data.posts)
       setPagination(data.pagination)
       setCurrentPage(page)
@@ -85,7 +85,7 @@ export default function BlogsPage() {
       // Check connection status
       setIsConnected(socketService.isConnectedToServer())
       console.log("📡 WebSocket connected:", socketService.isConnectedToServer())
-      
+
       // Join blog room for real-time updates
       socketService.joinBlogRoom()
 
@@ -93,7 +93,7 @@ export default function BlogsPage() {
       const handleNewPost = (newPost: Post) => {
         setPosts(prevPosts => [newPost, ...prevPosts.slice(0, 9)]) // Keep only 10 posts
         setPagination(prev => ({ ...prev, total: prev.total + 1 }))
-        
+
         toast({
           title: "新しい投稿",
           description: `${newPost.author.nickname}さんが新しい投稿をしました: ${newPost.title}`,
@@ -101,9 +101,9 @@ export default function BlogsPage() {
       }
 
       const handlePostLike = (data: { postId: string; likesCount: number; isLiked: boolean }) => {
-        setPosts(prevPosts => 
-          prevPosts.map(post => 
-            post.id === data.postId 
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === data.postId
               ? { ...post, likesCount: data.likesCount }
               : post
           )
@@ -111,9 +111,9 @@ export default function BlogsPage() {
       }
 
       const handleNewComment = (comment: any) => {
-        setPosts(prevPosts => 
-          prevPosts.map(post => 
-            post.id === comment.postId 
+        setPosts(prevPosts =>
+          prevPosts.map(post =>
+            post.id === comment.postId
               ? { ...post, commentsCount: post.commentsCount + 1 }
               : post
           )
@@ -144,7 +144,7 @@ export default function BlogsPage() {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    
+
     if (diffInHours < 1) {
       return "1時間未満前"
     } else if (diffInHours < 24) {
@@ -208,7 +208,7 @@ export default function BlogsPage() {
             <div className="sticky top-4 space-y-6">
               {/* Banner Skeleton */}
               <Skeleton className="w-full h-[300px] bg-pink-100 border-2 border-dashed border-pink-300 rounded" />
-              
+
               {/* Popular Posts Skeleton */}
               <Card>
                 <CardHeader>
@@ -252,8 +252,8 @@ export default function BlogsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center">
           <p className="text-red-600">{error}</p>
-          <Button 
-            onClick={() => fetchPosts(currentPage)} 
+          <Button
+            onClick={() => fetchPosts(currentPage)}
             className="mt-4"
           >
             再試行
@@ -294,7 +294,7 @@ export default function BlogsPage() {
             </p>
           </div>
 
-          {/* <AffiliateBanner src="" alt="Affiliate Banner" link="/" size="large" position="content" /> */}
+          {/* <AffiliateBanner src="/images/affiliate/timeline_header.png" alt="Affiliate Banner" link="" size="large" position="content" /> */}
           <div className="w-full overflow-hidden mb-6">
             <div className="relative">
               {iframeLargeLoading && (
@@ -307,16 +307,22 @@ export default function BlogsPage() {
                   </Skeleton>
                 </div>
               )}
-              <iframe 
-                className={`border-dashed border-pink-300 rounded w-full h-auto max-w-full transition-opacity duration-300 ${iframeLargeLoading ? 'opacity-0' : 'opacity-100'}`}
-                src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=844&count=5&pid=MLA5563&hd_flg=0&v=0&clr=e8ffef&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=5&seika=10000' 
-                width='844' 
-                height='273'
-                style={{ minHeight: '275px', aspectRatio: '844/273' }}
-                onLoad={() => {
-                  setTimeout(() => setIframeLargeLoading(false), 500)
-                }}
-              ></iframe>
+              <Link href="https://www.j-live.tv/loginform_ssl.php" className="relative" style={{ minHeight: '275px', aspectRatio: '844/273' }}>
+                <div>
+                <div className="absolute inset-0 z-10 w-full h-full">
+                </div>
+                <iframe
+                  className={`border-dashed border-pink-300 rounded w-full h-auto max-w-full transition-opacity duration-300 ${iframeLargeLoading ? 'opacity-0' : 'opacity-100'}`}
+                  src='https://hananokai.tv/lib/online-banner_make_balloon_slide.php?site=j&taiki=1&normal=1&two=1&h=275&w=844&count=5&pid=MLA5563&hd_flg=0&v=0&clr=e8ffef&size=0&bln=t&ani_flg=f&slide=t&dir=v&col=5&seika=10000'
+                  width='844'
+                  height='273'
+                  style={{ minHeight: '275px', aspectRatio: '844/273' }}
+                  onLoad={() => {
+                    setTimeout(() => setIframeLargeLoading(false), 500)
+                  }}
+                ></iframe>
+                </div>
+              </Link>
             </div>
           </div>
 
@@ -361,8 +367,8 @@ export default function BlogsPage() {
 
           {/* Pagination */}
           <div className="flex justify-center space-x-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               disabled={currentPage <= 1 || loading}
               onClick={() => fetchPosts(currentPage - 1)}
             >
@@ -371,9 +377,9 @@ export default function BlogsPage() {
             {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
               const pageNum = i + 1
               return (
-                <Button 
+                <Button
                   key={pageNum}
-                  variant="outline" 
+                  variant="outline"
                   className={currentPage === pageNum ? "bg-pink-600 text-white" : ""}
                   onClick={() => fetchPosts(pageNum)}
                   disabled={loading}
@@ -382,7 +388,7 @@ export default function BlogsPage() {
                 </Button>
               )
             })}
-            <Button 
+            <Button
               variant="outline"
               disabled={currentPage >= pagination.pages || loading}
               onClick={() => fetchPosts(currentPage + 1)}
@@ -396,7 +402,7 @@ export default function BlogsPage() {
         <div className="lg:w-80">
           <div className="sticky top-4 space-y-6">
             <AffiliateBanner src="/images/banner/blogs_sidebar.jpg" alt="Affiliate Banner" link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563" size="small" position="sidebar" />
-            
+
             {/* Alternative Sidebar Banner with Loading State */}
             {/* <div className="w-full overflow-hidden mb-6">
               <div className="relative">

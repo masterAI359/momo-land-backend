@@ -9,6 +9,7 @@ import { useState } from "react"
 import TroubleReportModal from "./trouble-report-modal"
 import LoginModal from "./login-modal"
 import { useAuth } from "@/lib/auth"
+import Image from "next/image"
 
 export default function Header() {
   const [showReportModal, setShowReportModal] = useState(false)
@@ -26,10 +27,11 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+            {/* <div className="w-8 h-8 bg-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
               m
             </div>
-            <span className="text-lg sm:text-xl font-bold text-gray-900">momoLand</span>
+            <span className="text-lg sm:text-xl font-bold text-gray-900">momoLand</span> */}
+            <img src="/images/logos/logo.png" alt="momoLand" className="w-24 sm:w-28 md:w-32 h-auto"/>
           </Link>
 
           <nav className="hidden md:flex space-x-8">
