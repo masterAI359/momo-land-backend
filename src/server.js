@@ -19,9 +19,10 @@ const app = express()
 const server = createServer(app)
 const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  },
+    origin: ['https://peach-ld.com'],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
 })
 
 // Middleware
