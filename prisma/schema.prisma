@@ -17,6 +17,16 @@ model User {
   password  String?  // Optional for guest users
   isGuest   Boolean  @default(false)
   avatar    String?
+  bio       String?
+  age       Int?
+  address   String?
+  phone     String?
+  role      UserRole @default(USER)
+  status    UserStatus @default(ACTIVE)
+  isMuted   Boolean  @default(false)
+  muteUntil DateTime?
+  isBlocked Boolean  @default(false)
+  lastLogin DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -28,20 +38,71 @@ model User {
   chatMessages  ChatMessage[]
   roomMembers   RoomMember[]
   reports       Report[]
+  adminActions  AdminAction[]
+  femaleProfile FemaleProfile?
+  follows       Follow[] @relation("Follower")
+  followers     Follow[] @relation("Following")
+  fanCommunityMembers FanCommunityMember[]
+  emojiReactions EmojiReaction[]
+  voiceMessages VoiceMessage[]
+  stories       Story[]
+  storyViews    StoryView[]
 
   @@map("users")
 }
 
+model Story {
+  id          String    @id @default(uuid())
+  content     String?   // Text content for text stories
+  mediaUrl    String?   // Image or video URL
+  mediaType   MediaType? // IMAGE, VIDEO, TEXT
+  duration    Int       @default(5) // Duration in seconds (default 5s for images, actual duration for videos)
+  backgroundColor String? // Background color for text stories
+  textColor   String?   // Text color
+  fontSize    String?   // Font size (small, medium, large)
+  fontStyle   String?   // Font style (normal, bold, italic)
+  stickers    Json?     // Array of sticker objects with position and type
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime  // 24 hours from creation
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  views StoryView[]
+
+  @@map("stories")
+}
+
+model StoryView {
+  id        String   @id @default(uuid())
+  viewedAt  DateTime @default(now())
+
+  // Relations
+  storyId String
+  story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewerId String
+  viewer   User   @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, viewerId])
+  @@map("story_views")
+}
+
 model Post {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   title       String
   content     String
   category    String
   excerpt     String?
-  isPublished Boolean  @default(true)
-  viewCount   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isPublished Boolean    @default(true)
+  status      PostStatus @default(PUBLISHED)
+  viewCount   Int        @default(0)
+  isBlurred   Boolean    @default(false)
+  mood        String?    // excited, happy, peaceful, grateful, determined
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   // Relations
   authorId String
@@ -49,21 +110,86 @@ model Post {
 
   comments Comment[]
   likes    Like[]
+  mediaAttachments MediaAttachment[]
+  emojiReactions EmojiReaction[]
 
   @@map("posts")
 }
 
-model Comment {
+model MediaAttachment {
+  id        String      @id @default(uuid())
+  filename  String
+  originalName String
+  mimeType  String
+  size      Int
+  url       String
+  type      MediaType   // IMAGE, VIDEO, AUDIO
+  duration  Int?        // For video/audio files in seconds
+  thumbnail String?     // Thumbnail URL for videos
+  caption   String?
+  createdAt DateTime    @default(now())
+
+  // Relations
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("media_attachments")
+}
+
+model VoiceMessage {
   id        String   @id @default(uuid())
-  content   String
+  filename  String
+  url       String
+  duration  Int      // Duration in seconds
+  waveform  String?  // JSON array of waveform data
+  transcript String? // Auto-generated transcript
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  // Relations
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  
+  roomId String?
+  room   ChatRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("voice_messages")
+}
+
+model EmojiReaction {
+  id        String   @id @default(uuid())
+  emoji     String   // The actual emoji character
+  createdAt DateTime @default(now())
+
+  // Relations
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  postId String?
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId, emoji])
+  @@unique([userId, commentId, emoji])
+  @@map("emoji_reactions")
+}
+
+model Comment {
+  id        String        @id @default(uuid())
+  content   String
+  status    CommentStatus @default(APPROVED)
+  isBlurred Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   // Relations
   postId   String
   post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
   authorId String
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  emojiReactions EmojiReaction[]
 
   @@map("comments")
 }
@@ -83,14 +209,17 @@ model Like {
 }
 
 model ChatRoom {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   name        String
   description String?
-  atmosphere  String   @default("romantic") // romantic, intimate, friendly
-  isPrivate   Boolean  @default(false)
-  maxMembers  Int      @default(50)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  atmosphere  String     @default("romantic") // romantic, intimate, friendly
+  isPrivate   Boolean    @default(false)
+  maxMembers  Int        @default(50)
+  status      RoomStatus @default(ACTIVE)
+  requiredRole UserRole  @default(USER)
+  isForced    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   // Relations
   creatorId String
@@ -98,6 +227,8 @@ model ChatRoom {
 
   messages ChatMessage[]
   members  RoomMember[]
+  bannedUsers RoomBan[]
+  voiceMessages VoiceMessage[]
 
   @@map("chat_rooms")
 }
@@ -118,11 +249,32 @@ model RoomMember {
   @@map("room_members")
 }
 
-model ChatMessage {
+model RoomBan {
   id        String   @id @default(uuid())
+  reason    String?
+  bannedAt  DateTime @default(now())
+  bannedBy  String
+  expiresAt DateTime?
+
+  // Relations
+  roomId String
+  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId String
+  user   User     @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+  @@map("room_bans")
+}
+
+model ChatMessage {
+  id        String        @id @default(uuid())
   content   String
-  type      String   @default("message") // message, join, leave, system
-  createdAt DateTime @default(now())
+  type      String        @default("message") // message, join, leave, system
+  status    MessageStatus @default(SENT)
+  isDeleted Boolean       @default(false)
+  deletedBy String?
+  deletedAt DateTime?
+  createdAt DateTime      @default(now())
 
   // Relations
   roomId String
@@ -134,16 +286,210 @@ model ChatMessage {
 }
 
 model Report {
-  id          String   @id @default(uuid())
-  type        String   // technical, inappropriate, spam, other
+  id          String       @id @default(uuid())
+  type        String       // technical, inappropriate, spam, other
   description String?
-  status      String   @default("pending") // pending, reviewed, resolved
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      ReportStatus @default(PENDING)
+  targetType  String?      // user, post, comment, message
+  targetId    String?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   // Relations
   reporterId String
   reporter   User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@map("reports")
+}
+
+model AdminAction {
+  id          String     @id @default(uuid())
+  action      String     // ban, unban, delete_post, approve_post, etc.
+  targetType  String     // user, post, comment, chat_message
+  targetId    String
+  reason      String?
+  metadata    Json?      // Additional action data
+  createdAt   DateTime   @default(now())
+
+  // Relations
+  adminId String
+  admin   User   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_actions")
+}
+
+model SystemNotification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String   @default("info") // info, warning, error, success
+  isActive  Boolean  @default(true)
+  targetRole UserRole? // If null, visible to all
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_notifications")
+}
+
+model AutoModerationRule {
+  id          String   @id @default(uuid())
+  name        String
+  pattern     String   // Regex pattern or keyword
+  action      String   // block, flag, delete
+  targetType  String   // post, comment, message
+  isActive    Boolean  @default(true)
+  severity    Int      @default(1) // 1-5 severity level
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("auto_moderation_rules")
+}
+
+model FemaleProfile {
+  id          String   @id @default(uuid())
+  stageName   String   @unique
+  realName    String?
+  description String?
+  avatar      String?
+  coverImage  String?
+  age         Int?
+  height      String?
+  measurements String?
+  specialties String[]
+  isDebuted   Boolean  @default(false)
+  debutDate   DateTime?
+  ranking     Int?
+  isActive    Boolean  @default(true)
+  totalEarnings Decimal? @default(0)
+  monthlyEarnings Decimal? @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fanCommunity FanCommunity?
+
+  @@map("female_profiles")
+}
+
+model FanCommunity {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isPrivate   Boolean  @default(false)
+  memberCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  femaleProfileId String @unique
+  femaleProfile   FemaleProfile @relation(fields: [femaleProfileId], references: [id], onDelete: Cascade)
+
+  members FanCommunityMember[]
+
+  @@map("fan_communities")
+}
+
+model FanCommunityMember {
+  id       String   @id @default(uuid())
+  joinedAt DateTime @default(now())
+  role     String   @default("member") // member, moderator
+
+  // Relations
+  communityId String
+  community   FanCommunity @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([communityId, userId])
+  @@map("fan_community_members")
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  followedAt DateTime @default(now())
+
+  // Relations
+  followerId  String
+  follower    User   @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User   @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+model SystemStats {
+  id        String   @id @default(uuid())
+  date      DateTime @unique @default(now())
+  userCount Int      @default(0)
+  postCount Int      @default(0)
+  messageCount Int   @default(0)
+  activeUsers Int    @default(0)
+  revenue   Decimal? @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("system_stats")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+  USER
+  GUEST
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING
+}
+
+enum PostStatus {
+  PUBLISHED
+  DRAFT
+  BLOCKED
+  PENDING_REVIEW
+  FLAGGED
+}
+
+enum CommentStatus {
+  APPROVED
+  PENDING
+  BLOCKED
+  FLAGGED
+}
+
+enum MessageStatus {
+  SENT
+  BLOCKED
+  DELETED
+  FLAGGED
+}
+
+enum RoomStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  TEXT
 }

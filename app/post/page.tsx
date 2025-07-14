@@ -2,19 +2,17 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { PenTool, Save, Eye, AlertCircle, Wifi, WifiOff } from "lucide-react"
+import { PenTool, Save, Eye, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import LoginModal from "@/components/login-modal"
-import api from "@/api/axios"
-import socketService from "@/lib/socket"
 
 export default function PostPage() {
   const [title, setTitle] = useState("")
@@ -22,33 +20,11 @@ export default function PostPage() {
   const [category, setCategory] = useState("初心者向け")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
 
   const categories = ["初心者向け", "上級者向け", "おすすめ", "レビュー"]
-
-  // WebSocket connection setup
-  useEffect(() => {
-    if (user) {
-      const token = localStorage.getItem("token")
-      if (token) {
-        console.log("📝 Post page: Setting up WebSocket connection")
-        socketService.connect(token)
-        
-        // Update connection status
-        const checkConnection = () => {
-          setIsConnected(socketService.isConnectedToServer())
-        }
-        const connectionInterval = setInterval(checkConnection, 1000)
-        
-        return () => {
-          clearInterval(connectionInterval)
-        }
-      }
-    }
-  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,103 +43,36 @@ export default function PostPage() {
       return
     }
 
-    if (content.trim().length < 10) {
-      toast({
-        title: "入力エラー",
-        description: "内容は10文字以上で入力してください。",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (title.trim().length > 200) {
-      toast({
-        title: "入力エラー",
-        description: "タイトルは200文字以内で入力してください。",
-        variant: "destructive",
-      })
-      return
-    }
-
     setIsSubmitting(true)
 
-    try {
-      // Check if user has valid token
-      const token = localStorage.getItem("token")
-      if (!token) {
-        toast({
-          title: "認証エラー",
-          description: "ログイン情報が見つかりません。再度ログインしてください。",
-          variant: "destructive",
-        })
-        setShowLoginModal(true)
-        return
-      }
+    // Simulate API call
+    await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      const postData = {
-        title: title.trim(),
-        content: content.trim(),
-        category: category,
-        excerpt: content.trim().substring(0, 200) + (content.trim().length > 200 ? "..." : "")
-      }
-
-      console.log("📝 Sending post data:", postData)
-      console.log("🔑 Token available:", token ? "Yes" : "No")
-      
-      const response = await api.post("/posts", postData)
-
-      console.log("✅ Post created successfully:", response.data)
-      
-      toast({
-        title: "投稿完了",
-        description: "体験記が正常に投稿されました！リアルタイムで他のユーザーに表示されます。",
-      })
-
-      // Clear form after successful submission
-      setTitle("")
-      setContent("")
-      setCategory("初心者向け")
-      
-      // Show success message with real-time info
-      if (isConnected) {
-        toast({
-          title: "🚀 リアルタイム配信中",
-          description: "あなたの投稿が他のユーザーにリアルタイムで表示されました！",
-        })
-      }
-      
-      // Redirect to the new post after a short delay
-      setTimeout(() => {
-        if (response.data.post?.id) {
-          router.push(`/blogs/${response.data.post.id}`)
-        }
-      }, 2000)
-    } catch (error: any) {
-      console.error("❌ Post creation error:", error)
-      console.error("Error details:", error.response?.data)
-      
-      let errorMessage = "投稿に失敗しました。もう一度お試しください。"
-      
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error
-      } else if (error.response?.data?.details) {
-        // Handle validation errors
-        const validationErrors = error.response.data.details
-        errorMessage = validationErrors.map((err: any) => err.msg).join(", ")
-      } else if (error.response?.status === 401) {
-        errorMessage = "認証エラーです。ログインし直してください。"
-      } else if (error.response?.status === 400) {
-        errorMessage = "入力データに問題があります。内容を確認してください。"
-      }
-      
-      toast({
-        title: "投稿エラー",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
+    // Save post to localStorage (in real app, this would be sent to backend)
+    const posts = JSON.parse(localStorage.getItem("momo_land_posts") || "[]")
+    const newPost = {
+      id: Date.now().toString(),
+      title: title.trim(),
+      content: content.trim(),
+      category,
+      author: user.nickname,
+      authorId: user.id,
+      likes: 0,
+      comments: 0,
+      createdAt: new Date().toISOString(),
     }
+
+    posts.unshift(newPost)
+    localStorage.setItem("momo_land_posts", JSON.stringify(posts))
+
+    setIsSubmitting(false)
+
+    toast({
+      title: "投稿完了",
+      description: "体験記が正常に投稿されました！",
+    })
+
+    router.push(`/blogs/${newPost.id}`)
   }
 
   if (!user) {
@@ -199,22 +108,9 @@ export default function PostPage() {
         {/* Post Form */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <PenTool className="w-5 h-5 text-pink-600" />
-                <span>新しい体験記を作成</span>
-              </div>
-              {isConnected ? (
-                <div className="flex items-center text-green-600">
-                  <Wifi className="w-4 h-4 mr-1" />
-                  <span className="text-sm">リアルタイム投稿</span>
-                </div>
-              ) : (
-                <div className="flex items-center text-red-600">
-                  <WifiOff className="w-4 h-4 mr-1" />
-                  <span className="text-sm">接続なし</span>
-                </div>
-              )}
+            <CardTitle className="flex items-center space-x-2">
+              <PenTool className="w-5 h-5 text-pink-600" />
+              <span>新しい体験記を作成</span>
             </CardTitle>
             <CardDescription>投稿者: {user.nickname} として投稿されます</CardDescription>
           </CardHeader>
@@ -223,7 +119,7 @@ export default function PostPage() {
               {/* Title */}
               <div>
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                  タイトル * <span className="text-xs text-gray-500">(1-200文字)</span>
+                  タイトル *
                 </label>
                 <Input
                   id="title"
@@ -231,12 +127,10 @@ export default function PostPage() {
                   placeholder="体験記のタイトルを入力してください"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className={`w-full ${title.length > 200 ? 'border-red-500' : ''}`}
-                  maxLength={200}
+                  className="w-full"
+                  maxLength={100}
                 />
-                <p className={`text-xs mt-1 ${title.length > 200 ? 'text-red-500' : 'text-gray-500'}`}>
-                  {title.length}/200文字
-                </p>
+                <p className="text-xs text-gray-500 mt-1">{title.length}/100文字</p>
               </div>
 
               {/* Category */}
@@ -260,7 +154,7 @@ export default function PostPage() {
               {/* Content */}
               <div>
                 <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-                  体験記の内容 * <span className="text-xs text-gray-500">(10文字以上)</span>
+                  体験記の内容 *
                 </label>
                 <Textarea
                   id="content"
@@ -268,11 +162,9 @@ export default function PostPage() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={12}
-                  className={`w-full ${content.trim().length > 0 && content.trim().length < 10 ? 'border-red-500' : ''}`}
+                  className="w-full"
                 />
-                <p className={`text-xs mt-1 ${content.trim().length > 0 && content.trim().length < 10 ? 'text-red-500' : 'text-gray-500'}`}>
-                  {content.length}文字 {content.trim().length > 0 && content.trim().length < 10 ? '(10文字以上必要)' : ''}
-                </p>
+                <p className="text-xs text-gray-500 mt-1">{content.length}文字</p>
               </div>
 
               {/* Guidelines */}
@@ -291,7 +183,7 @@ export default function PostPage() {
               <div className="flex space-x-4">
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !title.trim() || !content.trim() || content.trim().length < 10 || title.trim().length > 200}
+                  disabled={isSubmitting || !title.trim() || !content.trim()}
                   className="flex-1 bg-pink-600 hover:bg-pink-700"
                 >
                   {isSubmitting ? (
@@ -322,19 +214,6 @@ export default function PostPage() {
                   プレビュー
                 </Button>
               </div>
-              
-              {/* Debug Info */}
-              {process.env.NODE_ENV === 'development' && (
-                <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
-                  <p><strong>Debug Info:</strong></p>
-                  <p>Token: {typeof window !== 'undefined' && localStorage.getItem("token") ? "Available" : "Missing"}</p>
-                  <p>WebSocket: {isConnected ? "Connected" : "Disconnected"}</p>
-                  <p>Title length: {title.trim().length}/200</p>
-                  <p>Content length: {content.trim().length} (min: 10)</p>
-                  <p>Category: {category}</p>
-                  <p>User: {user?.nickname || "Not logged in"}</p>
-                </div>
-              )}
             </form>
           </CardContent>
         </Card>

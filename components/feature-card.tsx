@@ -65,16 +65,12 @@ export default function FeatureCard({
   return (
     <>
       <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleClick}>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="flex items-center space-x-2 text-base sm:text-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
             {icon}
             <span>{title}</span>
           </CardTitle>
-          {description && (
-            <CardDescription className="text-sm sm:text-base leading-relaxed">
-              {description}
-            </CardDescription>
-          )}
+          {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
       </Card>
       <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />

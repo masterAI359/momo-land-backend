@@ -13,13 +13,12 @@ export const metadata: Metadata = {
   title: "momoLand - ライブチャット体験記共有サイト",
   description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
   keywords: "ライブチャット, 体験記, 口コミ, レビュー, コミュニティ",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   openGraph: {
     title: "momoLand - ライブチャット体験記共有サイト",
     description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
     type: "website",
   },
-  generator: 'angel'
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -28,15 +27,15 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" suppressHydrationWarning={true}>
+    <html lang="ja">
       <head>
         <link rel="icon" href="/favicon.png" />
       </head>
-      <body className={inter.className} suppressHydrationWarning={true}>
+      <body className={inter.className}>
         <AuthProvider>
           <div className="min-h-screen flex flex-col bg-gray-50">
             <Header />
-            <main className="flex-1 pb-16">{children}</main>
+            <main className="flex-1">{children}</main>
             <Footer />
           </div>
           <Toaster />

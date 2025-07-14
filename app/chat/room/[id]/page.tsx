@@ -1,361 +1,322 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ArrowLeft, Users, Send, Wifi, WifiOff, Heart, Copy, UserPlus, Sparkles } from "lucide-react"
+import { Users, Send, Heart, ArrowLeft, Copy, UserPlus, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/lib/auth"
-import api from "@/api/axios"
-import socketService from "@/lib/socket"
 
 interface Message {
   id: string
+  user: string
   content: string
+  timestamp: Date
   type: "message" | "join" | "leave"
-  user: {
-    id: string
-    nickname: string
-  }
-  createdAt: string
 }
 
-interface ChatRoom {
+interface User {
   id: string
   name: string
-  description: string
-  atmosphere: string
-  isPrivate: boolean
-  maxMembers: number
-  creator: {
-    id: string
-    nickname: string
-  }
-  members: Array<{
-    user: {
-      id: string
-      nickname: string
-    }
-  }>
-  messages: Message[]
+  isOnline: boolean
+  joinedAt: Date
 }
 
-export default function ChatRoomPage() {
-  const params = useParams()
-  const { user } = useAuth()
-  const { toast } = useToast()
-  const [room, setRoom] = useState<ChatRoom | null>(null)
+export default function ChatRoomPage({ params }: { params: { id: string } }) {
+  const roomId = params.id
+  const [message, setMessage] = useState("")
   const [messages, setMessages] = useState<Message[]>([])
-  const [onlineUsers, setOnlineUsers] = useState<Array<{ id: string; nickname: string }>>([])
-  const [newMessage, setNewMessage] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [currentUser, setCurrentUser] = useState("ゲストユーザー")
   const [isConnected, setIsConnected] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { toast } = useToast()
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  // Sample room data
+  const roomData = {
+    id: roomId,
+    name:
+      roomId === "room-1"
+        ? "初心者向け雑談ルーム"
+        : roomId === "room-2"
+          ? "おすすめサイト情報交換"
+          : "プライベートルーム",
+    description: "ライブチャット愛好者のためのロマンチックなチャットルーム",
+    atmosphere: "romantic",
+    participants: 5,
   }
 
+  // Initialize chat room
   useEffect(() => {
-    scrollToBottom()
+    // Simulate connection
+    setIsConnected(true)
+
+    // Sample initial messages
+    const initialMessages: Message[] = [
+      {
+        id: "1",
+        user: "ユーザー1",
+        content: "こんにちは！このルームへようこそ 💕",
+        timestamp: new Date(Date.now() - 300000),
+        type: "message",
+      },
+      {
+        id: "2",
+        user: "ユーザー2",
+        content: "素敵な雰囲気のルームですね ✨",
+        timestamp: new Date(Date.now() - 240000),
+        type: "message",
+      },
+      {
+        id: "3",
+        user: "システム",
+        content: `${currentUser}さんがルームに参加しました`,
+        timestamp: new Date(),
+        type: "join",
+      },
+    ]
+
+    const initialUsers: User[] = [
+      { id: "1", name: "ユーザー1", isOnline: true, joinedAt: new Date(Date.now() - 3600000) },
+      { id: "2", name: "ユーザー2", isOnline: true, joinedAt: new Date(Date.now() - 1800000) },
+      { id: "3", name: currentUser, isOnline: true, joinedAt: new Date() },
+    ]
+
+    setMessages(initialMessages)
+    setUsers(initialUsers)
+  }, [currentUser])
+
+  // Auto scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const fetchRoomData = async () => {
-    try {
-      const response = await api.get(`/chat/rooms/${params.id}`)
-      const roomData = response.data.room
-      setRoom(roomData)
-      setMessages(roomData.messages || [])
-      setOnlineUsers(roomData.members?.map((m: any) => m.user) || [])
-    } catch (error: any) {
-      console.error("Failed to fetch room data:", error)
-      toast({
-        title: "エラー",
-        description: "チャットルームの読み込みに失敗しました",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
+  const sendMessage = () => {
+    if (!message.trim()) return
+
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      user: currentUser,
+      content: message,
+      timestamp: new Date(),
+      type: "message",
     }
-  }
 
-  const joinRoom = async () => {
-    try {
-      await api.post(`/chat/rooms/${params.id}/join`)
-      socketService.joinChatRoom(params.id as string)
-    } catch (error: any) {
-      console.error("Failed to join room:", error)
-      toast({
-        title: "エラー",
-        description: "ルームへの参加に失敗しました",
-        variant: "destructive",
-      })
-    }
-  }
+    setMessages((prev) => [...prev, newMessage])
+    setMessage("")
 
-  const leaveRoom = async () => {
-    try {
-      await api.post(`/chat/rooms/${params.id}/leave`)
-      socketService.leaveChatRoom(params.id as string)
-    } catch (error: any) {
-      console.error("Failed to leave room:", error)
-    }
-  }
+    // Simulate response after 2-3 seconds
+    setTimeout(
+      () => {
+        const responses = [
+          "それは興味深いですね！ 💖",
+          "同感です ✨",
+          "詳しく教えてください 🌹",
+          "素晴らしい体験談ですね 💕",
+          "私も似たような経験があります 😊",
+        ]
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || sending) return
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)]
+        const responseMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          user: "ユーザー" + (Math.floor(Math.random() * 3) + 1),
+          content: randomResponse,
+          timestamp: new Date(),
+          type: "message",
+        }
 
-    setSending(true)
-    try {
-      socketService.sendMessage(params.id as string, newMessage)
-      setNewMessage("")
-    } catch (error: any) {
-      console.error("Failed to send message:", error)
-      toast({
-        title: "エラー",
-        description: "メッセージの送信に失敗しました",
-        variant: "destructive",
-      })
-    } finally {
-      setSending(false)
-    }
-  }
-
-  useEffect(() => {
-    if (user) {
-      fetchRoomData()
-      joinRoom()
-    }
-  }, [user, params.id])
-
-  useEffect(() => {
-    if (user && room) {
-      setIsConnected(socketService.isConnectedToServer())
-
-      const handleNewMessage = (message: Message) => {
-        setMessages(prevMessages => [...prevMessages, message])
-      }
-
-      const handleUserJoined = (data: { user: any; timestamp: Date }) => {
-        setOnlineUsers(prevUsers => {
-          const exists = prevUsers.some(u => u.id === data.user.id)
-          if (!exists) {
-            return [...prevUsers, data.user]
-          }
-          return prevUsers
-        })
-      }
-
-      const handleUserLeft = (data: { user: any; timestamp: Date }) => {
-        setOnlineUsers(prevUsers => 
-          prevUsers.filter(u => u.id !== data.user.id)
-        )
-      }
-
-      socketService.onNewMessage(handleNewMessage)
-      socketService.onUserJoined(handleUserJoined)
-      socketService.onUserLeft(handleUserLeft)
-
-      const checkConnection = () => {
-        setIsConnected(socketService.isConnectedToServer())
-      }
-      const connectionInterval = setInterval(checkConnection, 5000)
-
-      return () => {
-        socketService.offNewMessage(handleNewMessage)
-        socketService.offUserJoined(handleUserJoined)
-        socketService.offUserLeft(handleUserLeft)
-        clearInterval(connectionInterval)
-        leaveRoom()
-      }
-    }
-  }, [user, room])
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
-  }
-
-  const getAtmosphereColor = (atmosphere: string) => {
-    switch (atmosphere) {
-      case "romantic":
-        return "bg-pink-100 text-pink-800 border-pink-200"
-      case "intimate":
-        return "bg-purple-100 text-purple-800 border-purple-200"
-      case "friendly":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getAtmosphereLabel = (atmosphere: string) => {
-    switch (atmosphere) {
-      case "romantic":
-        return "💕 ロマンチック"
-      case "intimate":
-        return "🌹 親密"
-      case "friendly":
-        return "😊 フレンドリー"
-      default:
-        return "💬 一般"
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">チャットルームを読み込み中...</p>
-        </div>
-      </div>
+        setMessages((prev) => [...prev, responseMessage])
+      },
+      2000 + Math.random() * 1000,
     )
   }
 
-  if (!room) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <p className="text-red-600">チャットルームが見つかりませんでした。</p>
-          <Link href="/chat">
-            <Button variant="outline" className="mt-4">
-              チャット一覧に戻る
-            </Button>
-          </Link>
-        </div>
-      </div>
-    )
+  const copyInviteUrl = () => {
+    const inviteUrl = `${window.location.origin}/chat/room/${roomId}?invite=true`
+    navigator.clipboard.writeText(inviteUrl)
+
+    toast({
+      title: "招待URLをコピーしました",
+      description: "友達にURLを共有してルームに招待しましょう！",
+    })
+  }
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString("ja-JP", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const getMessageBubbleStyle = (user: string) => {
+    if (user === currentUser) {
+      return "bg-gradient-to-r from-pink-500 to-rose-500 text-white ml-auto"
+    } else if (user === "システム") {
+      return "bg-gray-100 text-gray-600 mx-auto text-center text-sm"
+    } else {
+      return "bg-white border border-pink-200 text-gray-800"
+    }
   }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col lg:flex-row gap-8 h-[80vh]">
-        {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[600px] max-h-[80vh]">
+        {/* Chat Area */}
+        <div className="lg:col-span-3 flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <Link href="/chat">
-                <Button variant="ghost" size="sm" className="text-pink-600">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  戻る
-                </Button>
-              </Link>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{room.name}</h1>
-                <div className="flex items-center space-x-2 mt-1">
-                  <Badge className={`text-xs ${getAtmosphereColor(room.atmosphere)}`}>
-                    {getAtmosphereLabel(room.atmosphere)}
-                  </Badge>
-                  {isConnected ? (
-                    <div className="flex items-center text-green-600">
-                      <Wifi className="w-3 h-3 mr-1" />
-                      <span className="text-xs">リアルタイム</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-red-600">
-                      <WifiOff className="w-3 h-3 mr-1" />
-                      <span className="text-xs">接続なし</span>
-                    </div>
-                  )}
+          <Card className="mb-4 bg-gradient-to-r from-pink-50 to-rose-50 border-pink-200">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Link href="/chat">
+                    <Button variant="ghost" size="sm" className="text-pink-600">
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      戻る
+                    </Button>
+                  </Link>
+                  <div>
+                    <CardTitle className="flex items-center space-x-2 text-pink-800">
+                      <Sparkles className="w-5 h-5" />
+                      <span>{roomData.name}</span>
+                    </CardTitle>
+                    <p className="text-sm text-pink-600 mt-1">{roomData.description}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Badge className="bg-pink-100 text-pink-800 border-pink-200">💕 ロマンチック</Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyInviteUrl}
+                    className="border-pink-200 text-pink-600 hover:bg-pink-50 bg-transparent"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    招待
+                  </Button>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardHeader>
+          </Card>
 
           {/* Messages */}
           <Card className="flex-1 flex flex-col">
-            <CardContent className="flex-1 overflow-hidden p-4">
-              <div className="h-full overflow-y-auto space-y-4">
-                {messages.map((message) => (
-                  <div key={message.id} className={`flex ${message.type === "message" ? "flex-col" : "justify-center"}`}>
-                    {message.type === "message" ? (
-                      <div className={`max-w-xs lg:max-w-md ${message.user.id === user?.id ? "self-end" : "self-start"}`}>
-                        <div className={`rounded-lg px-4 py-2 ${
-                          message.user.id === user?.id 
-                            ? "bg-pink-600 text-white" 
-                            : "bg-gray-100 text-gray-900"
-                        }`}>
-                          <p className="text-sm font-medium mb-1">{message.user.nickname}</p>
-                          <p>{message.content}</p>
-                          <p className={`text-xs mt-1 ${
-                            message.user.id === user?.id ? "text-pink-100" : "text-gray-500"
-                          }`}>
-                            {formatTime(message.createdAt)}
-                          </p>
-                        </div>
+            <CardContent className="flex-1 p-4 overflow-y-auto bg-gradient-to-b from-pink-25 to-rose-25 max-h-[400px]">
+              <div className="space-y-4">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.user === currentUser ? "justify-end" : msg.type === "join" || msg.type === "leave" ? "justify-center" : "justify-start"}`}
+                  >
+                    <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${getMessageBubbleStyle(msg.user)}`}>
+                      {msg.user !== currentUser && msg.type === "message" && (
+                        <div className="text-xs text-pink-600 mb-1 font-medium">{msg.user}</div>
+                      )}
+                      <div className="break-words">{msg.content}</div>
+                      <div className={`text-xs mt-1 ${msg.user === currentUser ? "text-pink-100" : "text-gray-500"}`}>
+                        {formatTime(msg.timestamp)}
                       </div>
-                    ) : (
-                      <div className="text-center">
-                        <p className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full inline-block">
-                          {message.content}
-                        </p>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
               </div>
             </CardContent>
-          </Card>
 
-          {/* Message Input */}
-          <div className="mt-4 flex space-x-2">
-            <Input
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="メッセージを入力..."
-              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              className="flex-1"
-              disabled={sending}
-            />
-            <Button 
-              onClick={sendMessage}
-              disabled={!newMessage.trim() || sending}
-              className="bg-pink-600 hover:bg-pink-700"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
+            {/* Message Input */}
+            <div className="p-4 border-t bg-white sticky bottom-0">
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="メッセージを入力... 💕"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                  className="flex-1 border-pink-200 focus:border-pink-400"
+                />
+                <Button onClick={sendMessage} disabled={!message.trim()} className="bg-pink-600 hover:bg-pink-700">
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
 
         {/* Sidebar */}
-        <div className="lg:w-80 space-y-4">
-          {/* Room Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">ルーム情報</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600 mb-2">{room.description}</p>
-              <p className="text-xs text-gray-500">作成者: {room.creator.nickname}</p>
-            </CardContent>
-          </Card>
-
+        <div className="space-y-4">
           {/* Online Users */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center">
-                <Users className="w-5 h-5 mr-2" />
-                オンライン ({onlineUsers.length})
+              <CardTitle className="flex items-center space-x-2 text-pink-800">
+                <Users className="w-5 h-5" />
+                <span>参加者 ({users.length})</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {onlineUsers.map((user) => (
-                  <div key={user.id} className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm">{user.nickname}</span>
+            <CardContent className="space-y-3">
+              {users.map((user) => (
+                <div key={user.id} className="flex items-center space-x-3">
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback className="bg-pink-100 text-pink-600 text-xs">{user.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium">{user.name}</span>
+                      {user.isOnline && <div className="w-2 h-2 bg-green-500 rounded-full"></div>}
+                    </div>
+                    <div className="text-xs text-gray-500">{formatTime(user.joinedAt)}に参加</div>
                   </div>
-                ))}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Room Info */}
+          <Card className="bg-gradient-to-b from-pink-50 to-rose-50 border-pink-200">
+            <CardHeader>
+              <CardTitle className="text-pink-800 text-sm">💖 ルーム情報</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">雰囲気:</span>
+                <Badge className="bg-pink-100 text-pink-800 border-pink-200 text-xs">💕 ロマンチック</Badge>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">接続状態:</span>
+                <span className={`text-xs ${isConnected ? "text-green-600" : "text-red-600"}`}>
+                  {isConnected ? "✅ 接続中" : "❌ 切断"}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-pink-200">
+                <p className="text-xs text-pink-600">🌹 素敵な出会いと楽しい会話をお楽しみください</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm text-pink-800">クイックアクション</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-pink-600 border-pink-200 hover:bg-pink-50 bg-transparent"
+                onClick={copyInviteUrl}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                招待URLコピー
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-pink-600 border-pink-200 hover:bg-pink-50 bg-transparent"
+              >
+                <Heart className="w-4 h-4 mr-2" />
+                ルームをお気に入り
+              </Button>
             </CardContent>
           </Card>
         </div>

@@ -2,7 +2,6 @@ const express = require("express")
 const { body, validationResult, query } = require("express-validator")
 const prisma = require("../config/database")
 const { authenticateToken, optionalAuth } = require("../middleware/auth")
-const { emitToRoom } = require("../socket/socketService")
 
 const router = express.Router()
 
@@ -68,12 +67,34 @@ router.get(
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
+                femaleProfile: {
+                  select: {
+                    stageName: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+            mediaAttachments: {
+              orderBy: { createdAt: "asc" },
+            },
+            emojiReactions: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    avatar: true,
+                  },
+                },
               },
             },
             _count: {
               select: {
                 likes: true,
                 comments: true,
+                emojiReactions: true,
               },
             },
           },
@@ -84,13 +105,34 @@ router.get(
         prisma.post.count({ where }),
       ])
 
-      res.json({
-        posts: posts.map((post) => ({
+      // Process emoji reactions
+      const processedPosts = posts.map((post) => {
+        const groupedReactions = post.emojiReactions.reduce((acc, reaction) => {
+          if (!acc[reaction.emoji]) {
+            acc[reaction.emoji] = {
+              emoji: reaction.emoji,
+              count: 0,
+              users: [],
+            }
+          }
+          acc[reaction.emoji].count++
+          acc[reaction.emoji].users.push(reaction.user)
+          return acc
+        }, {})
+
+        return {
           ...post,
           likesCount: post._count.likes,
           commentsCount: post._count.comments,
+          reactionsCount: post._count.emojiReactions,
+          reactions: Object.values(groupedReactions),
+          emojiReactions: undefined,
           _count: undefined,
-        })),
+        }
+      })
+
+      res.json({
+        posts: processedPosts,
         pagination: {
           page,
           limit,
@@ -105,48 +147,6 @@ router.get(
   },
 )
 
-// Get popular posts (ranking)
-router.get("/ranking", optionalAuth, async (req, res) => {
-  try {
-    const posts = await prisma.post.findMany({
-      where: { isPublished: true },
-      include: {
-        author: {
-          select: {
-            id: true,
-            nickname: true,
-          },
-        },
-        _count: {
-          select: {
-            likes: true,
-            comments: true,
-          },
-        },
-      },
-      orderBy: {
-        likes: {
-          _count: "desc",
-        },
-      },
-      take: 50,
-    })
-
-    const rankedPosts = posts.map((post, index) => ({
-      ...post,
-      rank: index + 1,
-      likesCount: post._count.likes,
-      commentsCount: post._count.comments,
-      _count: undefined,
-    }))
-
-    res.json({ posts: rankedPosts })
-  } catch (error) {
-    console.error("Get ranking error:", error)
-    res.status(500).json({ error: "Failed to fetch ranking" })
-  }
-})
-
 // Get single post
 router.get("/:id", optionalAuth, async (req, res) => {
   try {
@@ -159,7 +159,17 @@ router.get("/:id", optionalAuth, async (req, res) => {
           select: {
             id: true,
             nickname: true,
+            avatar: true,
+            femaleProfile: {
+              select: {
+                stageName: true,
+                avatar: true,
+              },
+            },
           },
+        },
+        mediaAttachments: {
+          orderBy: { createdAt: "asc" },
         },
         comments: {
           include: {
@@ -167,15 +177,39 @@ router.get("/:id", optionalAuth, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
+              },
+            },
+            emojiReactions: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    nickname: true,
+                    avatar: true,
+                  },
+                },
               },
             },
           },
           orderBy: { createdAt: "asc" },
         },
+        emojiReactions: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                nickname: true,
+                avatar: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             likes: true,
             comments: true,
+            emojiReactions: true,
           },
         },
       },
@@ -205,11 +239,51 @@ router.get("/:id", optionalAuth, async (req, res) => {
       isLiked = !!like
     }
 
+    // Process emoji reactions for post
+    const groupedReactions = post.emojiReactions.reduce((acc, reaction) => {
+      if (!acc[reaction.emoji]) {
+        acc[reaction.emoji] = {
+          emoji: reaction.emoji,
+          count: 0,
+          users: [],
+        }
+      }
+      acc[reaction.emoji].count++
+      acc[reaction.emoji].users.push(reaction.user)
+      return acc
+    }, {})
+
+    // Process emoji reactions for comments
+    const processedComments = post.comments.map((comment) => {
+      const commentReactions = comment.emojiReactions.reduce((acc, reaction) => {
+        if (!acc[reaction.emoji]) {
+          acc[reaction.emoji] = {
+            emoji: reaction.emoji,
+            count: 0,
+            users: [],
+          }
+        }
+        acc[reaction.emoji].count++
+        acc[reaction.emoji].users.push(reaction.user)
+        return acc
+      }, {})
+
+      return {
+        ...comment,
+        reactions: Object.values(commentReactions),
+        emojiReactions: undefined,
+      }
+    })
+
     res.json({
       ...post,
       likesCount: post._count.likes,
       commentsCount: post._count.comments,
+      reactionsCount: post._count.emojiReactions,
+      reactions: Object.values(groupedReactions),
+      comments: processedComments,
       isLiked,
+      emojiReactions: undefined,
       _count: undefined,
     })
   } catch (error) {
@@ -218,7 +292,7 @@ router.get("/:id", optionalAuth, async (req, res) => {
   }
 })
 
-// Create post
+// Create post with media
 router.post(
   "/",
   [
@@ -226,11 +300,12 @@ router.post(
     body("content").trim().isLength({ min: 10 }),
     body("category").trim().isIn(["初心者向け", "上級者向け", "おすすめ", "レビュー"]),
     body("excerpt").optional().trim().isLength({ max: 500 }),
+    body("mood").optional().trim().isIn(["excited", "happy", "peaceful", "grateful", "determined"]),
+    body("mediaIds").optional().isArray(),
   ],
   authenticateToken,
   async (req, res) => {
     try {
-      // console.log("req.body =================", req.body)
       const errors = validationResult(req)
       if (!errors.isEmpty()) {
         return res.status(400).json({
@@ -239,7 +314,21 @@ router.post(
         })
       }
 
-      const { title, content, category, excerpt } = req.body
+      const { title, content, category, excerpt, mood, mediaIds = [] } = req.body
+
+      // Verify media attachments belong to user or are unassigned
+      if (mediaIds.length > 0) {
+        const mediaAttachments = await prisma.mediaAttachment.findMany({
+          where: {
+            id: { in: mediaIds },
+            postId: null, // Only unassigned media
+          },
+        })
+
+        if (mediaAttachments.length !== mediaIds.length) {
+          return res.status(400).json({ error: "Invalid media attachments" })
+        }
+      }
 
       const post = await prisma.post.create({
         data: {
@@ -247,6 +336,7 @@ router.post(
           content,
           category,
           excerpt: excerpt || content.substring(0, 200) + "...",
+          mood,
           authorId: req.user.id,
         },
         include: {
@@ -254,30 +344,90 @@ router.post(
             select: {
               id: true,
               nickname: true,
+              avatar: true,
+              femaleProfile: {
+                select: {
+                  stageName: true,
+                  avatar: true,
+                },
+              },
             },
           },
+          mediaAttachments: true,
           _count: {
             select: {
               likes: true,
               comments: true,
+              emojiReactions: true,
             },
           },
         },
       })
 
-      const postData = {
-        ...post,
-        likesCount: post._count.likes,
-        commentsCount: post._count.comments,
-        _count: undefined,
-      }
+      // Attach media to post
+      if (mediaIds.length > 0) {
+        await prisma.mediaAttachment.updateMany({
+          where: {
+            id: { in: mediaIds },
+          },
+          data: {
+            postId: post.id,
+          },
+        })
 
-      // Emit real-time event for new post
-      emitToRoom("blog-room", "new-post", postData)
+        // Fetch updated post with media
+        const updatedPost = await prisma.post.findUnique({
+          where: { id: post.id },
+          include: {
+            author: {
+              select: {
+                id: true,
+                nickname: true,
+                avatar: true,
+                femaleProfile: {
+                  select: {
+                    stageName: true,
+                    avatar: true,
+                  },
+                },
+              },
+            },
+            mediaAttachments: {
+              orderBy: { createdAt: "asc" },
+            },
+            _count: {
+              select: {
+                likes: true,
+                comments: true,
+                emojiReactions: true,
+              },
+            },
+          },
+        })
+
+        return res.status(201).json({
+          message: "Post created successfully",
+          post: {
+            ...updatedPost,
+            likesCount: updatedPost._count.likes,
+            commentsCount: updatedPost._count.comments,
+            reactionsCount: updatedPost._count.emojiReactions,
+            reactions: [],
+            _count: undefined,
+          },
+        })
+      }
 
       res.status(201).json({
         message: "Post created successfully",
-        post: postData,
+        post: {
+          ...post,
+          likesCount: post._count.likes,
+          commentsCount: post._count.comments,
+          reactionsCount: post._count.emojiReactions,
+          reactions: [],
+          _count: undefined,
+        },
       })
     } catch (error) {
       console.error("Create post error:", error)
@@ -321,15 +471,6 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
         },
       })
 
-      // Get updated like count
-      const likesCount = await prisma.like.count({
-        where: { postId: id },
-      })
-
-      // Emit real-time event for unlike
-      emitToRoom("blog-room", "post-liked", { postId: id, likesCount, isLiked: false })
-      emitToRoom(`post-${id}`, "post-liked", { postId: id, likesCount, isLiked: false })
-
       res.json({ message: "Post unliked", isLiked: false })
     } else {
       // Like
@@ -339,15 +480,6 @@ router.post("/:id/like", authenticateToken, async (req, res) => {
           userId: req.user.id,
         },
       })
-
-      // Get updated like count
-      const likesCount = await prisma.like.count({
-        where: { postId: id },
-      })
-
-      // Emit real-time event for like
-      emitToRoom("blog-room", "post-liked", { postId: id, likesCount, isLiked: true })
-      emitToRoom(`post-${id}`, "post-liked", { postId: id, likesCount, isLiked: true })
 
       res.json({ message: "Post liked", isLiked: true })
     }
@@ -395,18 +527,18 @@ router.post(
             select: {
               id: true,
               nickname: true,
+              avatar: true,
             },
           },
         },
       })
 
-      // Emit real-time event for new comment
-      emitToRoom("blog-room", "new-comment", comment)
-      emitToRoom(`post-${id}`, "new-comment", comment)
-
       res.status(201).json({
         message: "Comment added successfully",
-        comment,
+        comment: {
+          ...comment,
+          reactions: [],
+        },
       })
     } catch (error) {
       console.error("Add comment error:", error)

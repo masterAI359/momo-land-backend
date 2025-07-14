@@ -16,18 +16,16 @@ async function main() {
   await prisma.report.deleteMany()
   await prisma.user.deleteMany()
 
-  // Create users (including guest users)
+  // Create users
   const hashedPassword = await bcrypt.hash("password123", 10)
 
   const users = await Promise.all([
-    // Regular users
     prisma.user.create({
       data: {
         nickname: "ユーザー1",
         email: "user1@example.com",
         password: hashedPassword,
-        isGuest: false,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=user1",
+        avatar: null,
       },
     }),
     prisma.user.create({
@@ -35,8 +33,7 @@ async function main() {
         nickname: "ユーザー2",
         email: "user2@example.com",
         password: hashedPassword,
-        isGuest: false,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=user2",
+        avatar: null,
       },
     }),
     prisma.user.create({
@@ -44,8 +41,7 @@ async function main() {
         nickname: "ユーザー3",
         email: "user3@example.com",
         password: hashedPassword,
-        isGuest: false,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=user3",
+        avatar: null,
       },
     }),
     prisma.user.create({
@@ -53,8 +49,7 @@ async function main() {
         nickname: "チャット好き",
         email: "chat@example.com",
         password: hashedPassword,
-        isGuest: false,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=chat",
+        avatar: null,
       },
     }),
     prisma.user.create({
@@ -62,34 +57,14 @@ async function main() {
         nickname: "ライブチャット初心者",
         email: "beginner@example.com",
         password: hashedPassword,
-        isGuest: false,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=beginner",
-      },
-    }),
-    // Guest users (no password, isGuest: true)
-    prisma.user.create({
-      data: {
-        nickname: "ゲストユーザー1",
-        email: "guest1@example.com",
-        password: null,
-        isGuest: true,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=guest1",
-      },
-    }),
-    prisma.user.create({
-      data: {
-        nickname: "ゲストユーザー2",
-        email: "guest2@example.com",
-        password: null,
-        isGuest: true,
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=guest2",
+        avatar: null,
       },
     }),
   ])
 
-  console.log("✅ Created users (including guest users)")
+  console.log("✅ Created users")
 
-  // Create posts (including unpublished ones)
+  // Create posts
   const posts = await Promise.all([
     prisma.post.create({
       data: {
@@ -116,9 +91,8 @@ async function main() {
         category: "初心者向け",
         excerpt:
           "初めてのライブチャット体験について詳しく書きました。緊張していましたが、とても楽しい時間を過ごすことができました。",
-        isPublished: true,
-        viewCount: 156,
         authorId: users[4].id,
+        viewCount: 156,
       },
     }),
     prisma.post.create({
@@ -141,9 +115,8 @@ async function main() {
 初心者の方にはサイトAをおすすめします。使いやすさと料金のバランスが良いです。`,
         category: "おすすめ",
         excerpt: "複数のライブチャットサイトを比較して、それぞれの特徴をまとめました。",
-        isPublished: true,
-        viewCount: 234,
         authorId: users[0].id,
+        viewCount: 234,
       },
     }),
     prisma.post.create({
@@ -164,9 +137,8 @@ async function main() {
 これらのポイントを意識することで、より充実したライブチャット体験ができるはずです。`,
         category: "上級者向け",
         excerpt: "ライブチャットでの会話をより楽しむためのコツとテクニックをまとめました。",
-        isPublished: true,
-        viewCount: 189,
         authorId: users[1].id,
+        viewCount: 189,
       },
     }),
     prisma.post.create({
@@ -187,9 +159,8 @@ async function main() {
 安全第一で楽しいライブチャットライフを送りましょう！`,
         category: "レビュー",
         excerpt: "ライブチャットを安全に楽しむための重要な注意点をまとめました。",
-        isPublished: true,
-        viewCount: 298,
         authorId: users[2].id,
+        viewCount: 298,
       },
     }),
     prisma.post.create({
@@ -209,28 +180,15 @@ async function main() {
 良い出会いは突然やってくるものですね。自然体で接することの大切さを改めて感じました。`,
         category: "おすすめ",
         excerpt: "人気チャットレディとの素敵な出会いと、そこから学んだことについて書きました。",
-        isPublished: true,
-        viewCount: 445,
         authorId: users[3].id,
-      },
-    }),
-    // Draft post (unpublished)
-    prisma.post.create({
-      data: {
-        title: "下書き中の投稿",
-        content: `これはまだ下書き中の投稿です。内容を整理してから公開予定です。`,
-        category: "その他",
-        excerpt: null,
-        isPublished: false,
-        viewCount: 0,
-        authorId: users[0].id,
+        viewCount: 445,
       },
     }),
   ])
 
-  console.log("✅ Created posts (including draft)")
+  console.log("✅ Created posts")
 
-  // Create chat rooms with different atmospheres
+  // Create chat rooms
   const chatRooms = await Promise.all([
     prisma.chatRoom.create({
       data: {
@@ -238,7 +196,6 @@ async function main() {
         description: "ライブチャット初心者の方向けの雑談ルームです",
         atmosphere: "friendly",
         isPrivate: false,
-        maxMembers: 50,
         creatorId: users[0].id,
       },
     }),
@@ -248,7 +205,6 @@ async function main() {
         description: "おすすめのライブチャットサイトについて情報交換しましょう",
         atmosphere: "romantic",
         isPrivate: false,
-        maxMembers: 30,
         creatorId: users[1].id,
       },
     }),
@@ -268,42 +224,26 @@ async function main() {
         description: "ライブチャット上級者向けの深い議論をするルーム",
         atmosphere: "romantic",
         isPrivate: false,
-        maxMembers: 25,
         creatorId: users[3].id,
-      },
-    }),
-    prisma.chatRoom.create({
-      data: {
-        name: "ゲスト専用ルーム",
-        description: "ゲストユーザー専用のルームです",
-        atmosphere: "friendly",
-        isPrivate: false,
-        maxMembers: 20,
-        creatorId: users[5].id, // Guest user
       },
     }),
   ])
 
-  console.log("✅ Created chat rooms with different atmospheres")
+  console.log("✅ Created chat rooms")
 
-  // Create room members with more realistic data
+  // Create room members
   const roomMembers = []
   for (let i = 0; i < chatRooms.length; i++) {
     for (let j = 0; j < users.length; j++) {
       if (Math.random() > 0.3) {
         // 70% chance to join each room
-        const isOnline = Math.random() > 0.5
-        const lastSeen = isOnline 
-          ? new Date() 
-          : new Date(Date.now() - Math.random() * 86400000) // Random time in last 24h
-        
         roomMembers.push(
           prisma.roomMember.create({
             data: {
               roomId: chatRooms[i].id,
               userId: users[j].id,
-              isOnline,
-              lastSeen,
+              isOnline: Math.random() > 0.5,
+              lastSeen: new Date(Date.now() - Math.random() * 86400000), // Random time in last 24h
             },
           }),
         )
@@ -314,7 +254,7 @@ async function main() {
 
   console.log("✅ Created room members")
 
-  // Create chat messages with different types
+  // Create chat messages
   const chatMessages = []
   const messageContents = [
     "こんにちは！このルームへようこそ 💕",
@@ -329,33 +269,16 @@ async function main() {
     "セキュリティ面でも安心できます",
   ]
 
-  const messageTypes = ["message", "join", "leave", "system"]
-
   for (let i = 0; i < chatRooms.length; i++) {
-    // Add join messages
-    chatMessages.push(
-      prisma.chatMessage.create({
-        data: {
-          content: "ルームに参加しました",
-          type: "join",
-          roomId: chatRooms[i].id,
-          userId: users[0].id,
-          createdAt: new Date(Date.now() - 86400000 * 2), // 2 days ago
-        },
-      }),
-    )
-
-    // Add regular messages
     for (let j = 0; j < 15; j++) {
       const randomUser = users[Math.floor(Math.random() * users.length)]
       const randomContent = messageContents[Math.floor(Math.random() * messageContents.length)]
-      const randomType = messageTypes[Math.floor(Math.random() * messageTypes.length)]
 
       chatMessages.push(
         prisma.chatMessage.create({
           data: {
             content: randomContent,
-            type: randomType,
+            type: "message",
             roomId: chatRooms[i].id,
             userId: randomUser.id,
             createdAt: new Date(Date.now() - Math.random() * 86400000 * 7), // Random time in last week
@@ -363,23 +286,10 @@ async function main() {
         }),
       )
     }
-
-    // Add system messages
-    chatMessages.push(
-      prisma.chatMessage.create({
-        data: {
-          content: "ルームのルールをお読みください",
-          type: "system",
-          roomId: chatRooms[i].id,
-          userId: users[0].id, // System messages from room creator
-          createdAt: new Date(Date.now() - 86400000 * 3), // 3 days ago
-        },
-      }),
-    )
   }
   await Promise.all(chatMessages)
 
-  console.log("✅ Created chat messages with different types")
+  console.log("✅ Created chat messages")
 
   // Create comments
   const comments = []
@@ -397,56 +307,50 @@ async function main() {
   ]
 
   for (let i = 0; i < posts.length; i++) {
-    // Only add comments to published posts
-    if (posts[i].isPublished) {
-      const numComments = Math.floor(Math.random() * 8) + 2 // 2-9 comments per post
-      for (let j = 0; j < numComments; j++) {
-        const randomUser = users[Math.floor(Math.random() * users.length)]
-        const randomContent = commentContents[Math.floor(Math.random() * commentContents.length)]
+    const numComments = Math.floor(Math.random() * 8) + 2 // 2-9 comments per post
+    for (let j = 0; j < numComments; j++) {
+      const randomUser = users[Math.floor(Math.random() * users.length)]
+      const randomContent = commentContents[Math.floor(Math.random() * commentContents.length)]
 
-        comments.push(
-          prisma.comment.create({
-            data: {
-              content: randomContent,
-              postId: posts[i].id,
-              authorId: randomUser.id,
-              createdAt: new Date(Date.now() - Math.random() * 86400000 * 3), // Random time in last 3 days
-            },
-          }),
-        )
-      }
+      comments.push(
+        prisma.comment.create({
+          data: {
+            content: randomContent,
+            postId: posts[i].id,
+            authorId: randomUser.id,
+            createdAt: new Date(Date.now() - Math.random() * 86400000 * 3), // Random time in last 3 days
+          },
+        }),
+      )
     }
   }
   await Promise.all(comments)
 
-  console.log("✅ Created comments (only for published posts)")
+  console.log("✅ Created comments")
 
-  // Create likes (only for published posts)
+  // Create likes
   const likes = []
   for (let i = 0; i < posts.length; i++) {
-    // Only add likes to published posts
-    if (posts[i].isPublished) {
-      const numLikes = Math.floor(Math.random() * users.length) + 1
-      const shuffledUsers = [...users].sort(() => 0.5 - Math.random())
+    const numLikes = Math.floor(Math.random() * users.length) + 1
+    const shuffledUsers = [...users].sort(() => 0.5 - Math.random())
 
-      for (let j = 0; j < numLikes; j++) {
-        likes.push(
-          prisma.like.create({
-            data: {
-              postId: posts[i].id,
-              userId: shuffledUsers[j].id,
-              createdAt: new Date(Date.now() - Math.random() * 86400000 * 5), // Random time in last 5 days
-            },
-          }),
-        )
-      }
+    for (let j = 0; j < numLikes; j++) {
+      likes.push(
+        prisma.like.create({
+          data: {
+            postId: posts[i].id,
+            userId: shuffledUsers[j].id,
+            createdAt: new Date(Date.now() - Math.random() * 86400000 * 5), // Random time in last 5 days
+          },
+        }),
+      )
     }
   }
   await Promise.all(likes)
 
-  console.log("✅ Created likes (only for published posts)")
+  console.log("✅ Created likes")
 
-  // Create reports with different types and statuses
+  // Create some reports
   await Promise.all([
     prisma.report.create({
       data: {
@@ -464,49 +368,27 @@ async function main() {
         reporterId: users[1].id,
       },
     }),
-    prisma.report.create({
-      data: {
-        type: "spam",
-        description: "スパムコメントが多数投稿されています",
-        status: "resolved",
-        reporterId: users[2].id,
-      },
-    }),
-    prisma.report.create({
-      data: {
-        type: "other",
-        description: "その他の問題について",
-        status: "pending",
-        reporterId: users[5].id, // Guest user
-      },
-    }),
   ])
 
-  console.log("✅ Created reports with different types and statuses")
+  console.log("✅ Created reports")
 
   console.log("🎉 Seed completed successfully!")
 
   // Print summary
   const userCount = await prisma.user.count()
-  const regularUserCount = await prisma.user.count({ where: { isGuest: false } })
-  const guestUserCount = await prisma.user.count({ where: { isGuest: true } })
   const postCount = await prisma.post.count()
-  const publishedPostCount = await prisma.post.count({ where: { isPublished: true } })
-  const draftPostCount = await prisma.post.count({ where: { isPublished: false } })
   const roomCount = await prisma.chatRoom.count()
   const messageCount = await prisma.chatMessage.count()
   const commentCount = await prisma.comment.count()
   const likeCount = await prisma.like.count()
-  const reportCount = await prisma.report.count()
 
   console.log("\n📊 Database Summary:")
-  console.log(`👥 Total Users: ${userCount} (${regularUserCount} regular, ${guestUserCount} guest)`)
-  console.log(`📝 Total Posts: ${postCount} (${publishedPostCount} published, ${draftPostCount} draft)`)
+  console.log(`👥 Users: ${userCount}`)
+  console.log(`📝 Posts: ${postCount}`)
   console.log(`💬 Chat Rooms: ${roomCount}`)
   console.log(`💭 Messages: ${messageCount}`)
   console.log(`💬 Comments: ${commentCount}`)
   console.log(`❤️ Likes: ${likeCount}`)
-  console.log(`🚨 Reports: ${reportCount}`)
 }
 
 main()
