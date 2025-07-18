@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
@@ -13,13 +13,19 @@ export const metadata: Metadata = {
   title: "momoLand - ライブチャット体験記共有サイト",
   description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
   keywords: "ライブチャット, 体験記, 口コミ, レビュー, コミュニティ",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   openGraph: {
     title: "momoLand - ライブチャット体験記共有サイト",
     description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
     type: "website",
   },
   generator: 'angel'
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({

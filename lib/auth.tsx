@@ -8,11 +8,28 @@ import { useState, useEffect, createContext, useContext } from "react"
 interface User {
   id: string
   email: string
-  avatar: string
+  avatar?: string
   nickname: string
-  password: string
+  password?: string
   isGuest: boolean
+  role: "USER" | "MODERATOR" | "ADMIN" | "SUPER_ADMIN"
+  isActive: boolean
+  isBlocked: boolean
+  isSuspended: boolean
+  suspendedUntil?: Date | null
   createdAt: Date
+  // Enhanced profile fields
+  fullName?: string
+  bio?: string
+  age?: number
+  location?: string
+  phone?: string
+  website?: string
+  gender?: string
+  occupation?: string
+  interests?: string[]
+  lastLoginAt?: Date
+  lastActiveAt?: Date
 }
 
 interface AuthContextType {
