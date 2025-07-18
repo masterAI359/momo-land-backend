@@ -69,6 +69,7 @@ export default function BlogPostPage() {
   const [liking, setLiking] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [realtimeUpdates, setRealtimeUpdates] = useState(0);
+  const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
 
   const fetchPost = async () => {
     try {
@@ -168,9 +169,11 @@ export default function BlogPostPage() {
         return prevPost;
       }
 
+      console.log("📖 Blog Post: Adding comment from form submission");
       return {
         ...prevPost,
         comments: [...existingComments, newComment],
+        commentsCount: (prevPost.commentsCount || 0) + 1
       };
     });
 
@@ -246,13 +249,20 @@ export default function BlogPostPage() {
 
         const handleNewComment = (comment: any) => {
           console.log("📖 Blog Post: New comment received", comment);
-          if (comment.postId === params.id) {
+          
+          // Add postId to comment if not present
+          const commentWithPostId = {
+            ...comment,
+            postId: comment.postId || params.id
+          };
+          
+          if (commentWithPostId.postId === params.id) {
             setPost((prevPost) => {
               if (!prevPost) return prevPost;
               
               // Check if comment already exists to prevent duplicates
               const existingComments = prevPost.comments || [];
-              const commentExists = existingComments.some(existingComment => existingComment.id === comment.id);
+              const commentExists = existingComments.some(existingComment => existingComment.id === commentWithPostId.id);
               
               if (commentExists) {
                 console.log("📖 Blog Post: Duplicate comment detected, skipping");
@@ -260,18 +270,34 @@ export default function BlogPostPage() {
               }
 
               console.log("📖 Blog Post: Adding new comment to state");
-              return {
+              
+              // Mark this comment as new for highlighting
+              setNewCommentIds(prev => new Set(prev).add(commentWithPostId.id));
+              
+              // Remove the highlight after 3 seconds
+              setTimeout(() => {
+                setNewCommentIds(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(commentWithPostId.id);
+                  return newSet;
+                });
+              }, 3000);
+              
+              const updatedPost = {
                 ...prevPost,
-                comments: [...existingComments, comment],
+                comments: [...existingComments, commentWithPostId],
+                commentsCount: (prevPost.commentsCount || 0) + 1
               };
+              
+              return updatedPost;
             });
 
             // Show notification only if it's not the current user's comment
-            if (comment.author.id !== user.id) {
+            if (commentWithPostId.author.id !== user.id) {
               setRealtimeUpdates(prev => prev + 1);
               toast({
                 title: "💬 新しいコメント",
-                description: `${comment.author.nickname}さんがコメントしました`,
+                description: `${commentWithPostId.author.nickname}さんがコメントしました`,
               });
             }
           }
@@ -454,9 +480,30 @@ export default function BlogPostPage() {
       {/* Comments Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">
-            コメント ({processedComments.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl flex items-center">
+              <MessageSquare className="w-5 h-5 mr-2 text-pink-600" />
+              コメント ({processedComments.length})
+            </CardTitle>
+            <div className="flex items-center text-sm">
+              {isConnected ? (
+                <div className="flex items-center text-green-600">
+                  <Wifi className="w-4 h-4 mr-1" />
+                  <span>リアルタイム</span>
+                  {realtimeUpdates > 0 && (
+                    <span className="ml-2 bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full animate-pulse">
+                      {realtimeUpdates} 更新
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center text-gray-400">
+                  <WifiOff className="w-4 h-4 mr-1" />
+                  <span>オフライン</span>
+                </div>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {processedComments.length > 0 ? (
@@ -464,15 +511,24 @@ export default function BlogPostPage() {
               {processedComments.map((comment) => {
                 // Safe rendering with fallback for malformed comments
                 try {
+                  const isNewComment = newCommentIds.has(comment.id);
+                  
                   return (
                     <div
                       key={comment.id}
-                      className="border-b border-gray-100 pb-4 last:border-b-0 animate-in fade-in-50 duration-300"
+                      className={`border-b border-gray-100 pb-4 last:border-b-0 animate-in fade-in-50 slide-in-from-bottom-2 duration-500 ${
+                        isNewComment ? 'bg-blue-50 border-blue-200 rounded-lg p-3 -mx-3' : ''
+                      }`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-gray-900 flex items-center">
                           <User className="w-4 h-4 mr-1 text-gray-500" />
                           {comment.author?.nickname || "匿名ユーザー"}
+                          {isNewComment && (
+                            <span className="ml-2 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">
+                              NEW
+                            </span>
+                          )}
                         </span>
                         <span className="text-sm text-gray-500 flex items-center">
                           <Clock className="w-3 h-3 mr-1" />

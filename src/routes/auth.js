@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const prisma = require("../config/database");
-const { authenticateToken } = require("../middleware/auth");
+const { authenticateToken, logUserActivity } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -77,6 +77,7 @@ router.post(
           password: true,
           avatar: true,
           isGuest: true,
+          role: true,
           createdAt: true,
         },
       });
@@ -140,6 +141,13 @@ router.post(
         expiresIn: process.env.JWT_EXPIRES_IN || "7d",
       });
 
+      // Log user activity
+      await logUserActivity(user.id, "login", {
+        email: user.email,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date()
+      }, req);
+
       res.json({
         message: "Login successful",
         user: {
@@ -148,6 +156,7 @@ router.post(
           email: user.email,
           avatar: user.avatar,
           isGuest: user.isGuest,
+          role: user.role,
           createdAt: user.createdAt,
         },
         token,

@@ -10,6 +10,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User model with enhanced profile and admin features
 model User {
   id        String   @id @default(uuid())
   nickname  String   @unique
@@ -20,6 +21,33 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Enhanced profile fields
+  fullName    String?
+  bio         String?
+  age         Int?
+  dateOfBirth DateTime?
+  address     String?
+  phone       String?
+  website     String?
+  location    String?
+  gender      String?
+  occupation  String?
+  interests   String[]
+  socialLinks Json?     // {twitter: "url", instagram: "url", etc.}
+  profileVisibility String @default("public") // public, friends, private
+  profileCompleteness Int @default(0) // 0-100 percentage
+
+  // Admin and moderation fields
+  role        Role     @default(USER)
+  permissions Permission[]
+  isActive    Boolean  @default(true)
+  isBlocked   Boolean  @default(false)
+  isSuspended Boolean  @default(false)
+  suspendedUntil DateTime?
+  suspendReason  String?
+  lastLoginAt    DateTime?
+  lastActiveAt   DateTime?
+
   // Relations
   posts         Post[]
   comments      Comment[]
@@ -28,10 +56,59 @@ model User {
   chatMessages  ChatMessage[]
   roomMembers   RoomMember[]
   reports       Report[]
+  
+  // Admin-related relations
+  adminActions       AdminAction[]
+  moderationActions  ModerationAction[]
+  receivedModerations ModerationAction[] @relation("UserModerated")
+  userPermissions    UserPermission[]
+  activities         UserActivity[]     @relation("UserActivities")
 
   @@map("users")
 }
 
+// Role enum
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+// Permission model
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  category    String   // user_management, content_management, system_management
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users           User[]
+  userPermissions UserPermission[]
+
+  @@map("permissions")
+}
+
+// User-Permission junction table for fine-grained permissions
+model UserPermission {
+  id        String   @id @default(uuid())
+  userId    String
+  permissionId String
+  grantedAt DateTime @default(now())
+  grantedBy String?
+  expiresAt DateTime?
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// Enhanced Post model with moderation
 model Post {
   id          String   @id @default(uuid())
   title       String
@@ -43,6 +120,15 @@ model Post {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Moderation fields
+  status           ContentStatus @default(APPROVED)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  isBlocked        Boolean       @default(false)
+  isFeatured       Boolean       @default(false)
+  priority         Int           @default(0)
+
   // Relations
   authorId String
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -53,11 +139,19 @@ model Post {
   @@map("posts")
 }
 
+// Enhanced Comment model with moderation
 model Comment {
   id        String   @id @default(uuid())
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Moderation fields
+  status           ContentStatus @default(APPROVED)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  isBlocked        Boolean       @default(false)
 
   // Relations
   postId   String
@@ -68,6 +162,152 @@ model Comment {
   @@map("comments")
 }
 
+// Enhanced ChatMessage model with moderation
+model ChatMessage {
+  id        String   @id @default(uuid())
+  content   String
+  type      String   @default("message") // message, join, leave, system
+  createdAt DateTime @default(now())
+
+  // Moderation fields
+  status           ContentStatus @default(APPROVED)
+  moderationReason String?
+  moderatedAt      DateTime?
+  moderatedBy      String?
+  isBlocked        Boolean       @default(false)
+
+  // Relations
+  roomId String
+  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+// Content status enum
+enum ContentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+  HIDDEN
+}
+
+// Admin action logging
+model AdminAction {
+  id          String   @id @default(uuid())
+  adminId     String
+  action      String   // create_user, delete_post, ban_user, etc.
+  targetType  String   // user, post, comment, chat_message, etc.
+  targetId    String?
+  details     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_actions")
+}
+
+// Moderation action tracking
+model ModerationAction {
+  id        String   @id @default(uuid())
+  moderatorId String
+  userId      String
+  action      ModerationActionType
+  reason      String?
+  details     Json?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  moderator User @relation(fields: [moderatorId], references: [id], onDelete: Cascade)
+  user      User @relation("UserModerated", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("moderation_actions")
+}
+
+// Moderation action types
+enum ModerationActionType {
+  WARN
+  SUSPEND
+  BAN
+  BLOCK
+  UNBAN
+  UNSUSPEND
+  UNBLOCK
+  MUTE
+  UNMUTE
+}
+
+// Enhanced Report model
+model Report {
+  id          String   @id @default(uuid())
+  type        String   // technical, inappropriate, spam, other
+  description String?
+  status      String   @default("pending") // pending, reviewed, resolved, dismissed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Enhanced fields
+  targetType  String?  // user, post, comment, chat_message
+  targetId    String?
+  priority    ReportPriority @default(MEDIUM)
+  assignedTo  String?
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  resolution  String?
+
+  // Relations
+  reporterId String
+  reporter   User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+// Report priority enum
+enum ReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// System settings for admin configuration
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  category    String   // general, security, moderation, etc.
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_settings")
+}
+
+// User activity tracking
+model UserActivity {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String   // login, logout, post_created, comment_added, etc.
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation("UserActivities", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_activities")
+}
+
+// Like model (unchanged)
 model Like {
   id        String   @id @default(uuid())
   createdAt DateTime @default(now())
@@ -82,6 +322,7 @@ model Like {
   @@map("likes")
 }
 
+// ChatRoom model (unchanged)
 model ChatRoom {
   id          String   @id @default(uuid())
   name        String
@@ -102,6 +343,7 @@ model ChatRoom {
   @@map("chat_rooms")
 }
 
+// RoomMember model (unchanged)
 model RoomMember {
   id       String   @id @default(uuid())
   joinedAt DateTime @default(now())
@@ -116,34 +358,4 @@ model RoomMember {
 
   @@unique([roomId, userId])
   @@map("room_members")
-}
-
-model ChatMessage {
-  id        String   @id @default(uuid())
-  content   String
-  type      String   @default("message") // message, join, leave, system
-  createdAt DateTime @default(now())
-
-  // Relations
-  roomId String
-  room   ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  userId String
-  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("chat_messages")
-}
-
-model Report {
-  id          String   @id @default(uuid())
-  type        String   // technical, inappropriate, spam, other
-  description String?
-  status      String   @default("pending") // pending, reviewed, resolved
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  reporterId String
-  reporter   User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
-
-  @@map("reports")
 }

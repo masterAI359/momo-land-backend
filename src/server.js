@@ -12,6 +12,8 @@ const userRoutes = require("./routes/users")
 const postRoutes = require("./routes/posts")
 const { router: chatRoutes, setSocketIO: setChatSocketIO } = require("./routes/chat")
 const reportRoutes = require("./routes/reports")
+const adminRoutes = require("./routes/admin")
+const profileRoutes = require("./routes/profile")
 const { setupSocketHandlers } = require("./socket/handlers")
 const { setSocketIO } = require("./socket/socketService")
 
@@ -19,7 +21,7 @@ const app = express()
 const server = createServer(app)
 const io = new Server(server, {
   cors: {
-    origin: ['https://peach-ld.com'],
+    origin: ['*'],
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -53,6 +55,8 @@ app.use("/api/users", userRoutes)
 app.use("/api/posts", postRoutes)
 app.use("/api/chat", chatRoutes)
 app.use("/api/reports", reportRoutes)
+app.use("/api/admin", adminRoutes)
+app.use("/api/profile", profileRoutes)
 
 // Health check
 app.get("/api/health", (req, res) => {
