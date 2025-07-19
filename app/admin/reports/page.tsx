@@ -120,9 +120,9 @@ export default function AdminReportsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [filters, setFilters] = useState<ReportFilters>({
     search: "",
-    status: "",
-    type: "",
-    priority: "",
+    status: "all",
+    type: "all",
+    priority: "all",
     sortBy: "createdAt",
     sortOrder: "desc"
   })
@@ -186,9 +186,9 @@ export default function AdminReportsPage() {
         page: currentPage.toString(),
         limit: "20",
         ...(filters.search && { search: filters.search }),
-        ...(filters.status && { status: filters.status }),
-        ...(filters.type && { type: filters.type }),
-        ...(filters.priority && { priority: filters.priority }),
+        ...(filters.status && filters.status !== "all" && { status: filters.status }),
+        ...(filters.type && filters.type !== "all" && { type: filters.type }),
+        ...(filters.priority && filters.priority !== "all" && { priority: filters.priority }),
         sortBy: filters.sortBy,
         sortOrder: filters.sortOrder
       })
@@ -584,7 +584,7 @@ export default function AdminReportsPage() {
                       <SelectValue placeholder="全て" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全て</SelectItem>
+                      <SelectItem value="all">全て</SelectItem>
                       <SelectItem value="pending">未対応</SelectItem>
                       <SelectItem value="reviewed">確認中</SelectItem>
                       <SelectItem value="resolved">解決済み</SelectItem>
@@ -600,7 +600,7 @@ export default function AdminReportsPage() {
                       <SelectValue placeholder="全て" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全て</SelectItem>
+                      <SelectItem value="all">全て</SelectItem>
                       <SelectItem value="technical">技術的問題</SelectItem>
                       <SelectItem value="inappropriate">不適切なコンテンツ</SelectItem>
                       <SelectItem value="spam">スパム</SelectItem>
@@ -616,7 +616,7 @@ export default function AdminReportsPage() {
                       <SelectValue placeholder="全て" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">全て</SelectItem>
+                      <SelectItem value="all">全て</SelectItem>
                       <SelectItem value="LOW">低</SelectItem>
                       <SelectItem value="MEDIUM">中</SelectItem>
                       <SelectItem value="HIGH">高</SelectItem>
