@@ -40,9 +40,13 @@ export default function RootLayout({
       </head>
       <body className={inter.className} suppressHydrationWarning={true}>
         <AuthProvider>
-          <div className="min-h-screen flex flex-col bg-gray-50">
+          <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
             <Header />
-            <main className="flex-1 pb-16">{children}</main>
+            <main className="flex-1 flex flex-col">
+              <div className="flex flex-col flex-1 max-w-full overflow-x-hidden">
+                {children}
+              </div>
+            </main>
             <Footer />
           </div>
           <Toaster />

@@ -100,11 +100,29 @@ export default function ChatRoomPage() {
   }
 
   const leaveRoom = async () => {
+    if (!user || !room) {
+      toast({
+        title: "エラー",
+        description: "ルーム情報が取得できません",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       await api.post(`/chat/rooms/${params.id}/leave`)
       socketService.leaveChatRoom(params.id as string)
+      toast({
+        title: "退出完了",
+        description: "ルームから退出しました",
+      })
     } catch (error: any) {
       console.error("Failed to leave room:", error)
+      toast({
+        title: "エラー",
+        description: error.response?.data?.error || "ルームからの退出に失敗しました",
+        variant: "destructive",
+      })
     }
   }
 

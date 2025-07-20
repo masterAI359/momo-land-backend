@@ -52,12 +52,6 @@ export default function Footer() {
                   className="object-contain"
                 />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold">momoLand</h2>
-                <Badge variant="secondary" className="text-xs">
-                  コミュニティサイト
-                </Badge>
-              </div>
             </div>
             
             <p className="text-gray-300 text-sm leading-relaxed max-w-md">
