@@ -1,7 +1,7 @@
 const express = require("express")
 const { body, validationResult, query } = require("express-validator")
 const prisma = require("../config/database")
-const { authenticateToken, optionalAuth } = require("../middleware/auth")
+const { authenticateToken, optionalAuth, logUserActivity, logActivity } = require("../middleware/auth")
 const { emitToRoom } = require("../socket/socketService")
 
 const router = express.Router()
@@ -17,6 +17,15 @@ router.get(
     query("sortBy").optional().isIn(["createdAt", "likes", "views", "comments"]),
   ],
   optionalAuth,
+  logActivity("page_view", (req, data) => ({
+    page: "posts",
+    filters: {
+      category: req.query.category,
+      search: req.query.search,
+      sortBy: req.query.sortBy
+    },
+    resultCount: data.posts?.length || 0
+  })),
   async (req, res) => {
     try {
       const errors = validationResult(req)
@@ -272,6 +281,13 @@ router.post(
         _count: undefined,
       }
 
+      // Log user activity
+      await logUserActivity(req.user.id, "post_created", {
+        postId: post.id,
+        title: post.title,
+        category: post.category
+      }, req);
+
       // Emit real-time event for new post
       emitToRoom("blog-room", "new-post", postData)
 
@@ -400,9 +416,15 @@ router.post(
         },
       })
 
-      // Emit real-time event for new comment
-      emitToRoom("blog-room", "new-comment", comment)
-      emitToRoom(`post-${id}`, "new-comment", comment)
+      // Emit real-time event for new comment with postId included
+      const commentWithPostId = {
+        ...comment,
+        postId: id
+      }
+      
+      console.log(`📡 Emitting new comment to blog-room and post-${id}:`, commentWithPostId)
+      emitToRoom("blog-room", "new-comment", commentWithPostId)
+      emitToRoom(`post-${id}`, "new-comment", commentWithPostId)
 
       res.status(201).json({
         message: "Comment added successfully",

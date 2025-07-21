@@ -2,7 +2,7 @@ import axios from "axios"
 
 // Build API URL ensuring it includes /api path
 const getApiUrl = () => {
-  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:3001"
+  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || "http://localhost:5000"
   
   // If serverUrl already includes /api, use it as is
   if (serverUrl.includes('/api')) {

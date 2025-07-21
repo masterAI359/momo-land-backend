@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const prisma = require("../config/database");
-const { authenticateToken } = require("../middleware/auth");
+const { authenticateToken, logUserActivity } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -23,6 +23,7 @@ router.post(
   ],
   async (req, res) => {
     try {
+      console.log(req.body)
 
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -76,6 +77,7 @@ router.post(
           password: true,
           avatar: true,
           isGuest: true,
+          role: true,
           createdAt: true,
         },
       });
@@ -120,7 +122,7 @@ router.post(
 
       if (!user) {
         return res.status(401).json({
-          error: "Invalid email or password",
+          error: "無効なメールアドレスまたはパスワードです。",
         });
       }
   
@@ -129,7 +131,7 @@ router.post(
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
           return res.status(401).json({
-            error: "Invalid email or password",
+            error: "無効なメールアドレスまたはパスワードです。",
           });
         }
       }
@@ -139,6 +141,13 @@ router.post(
         expiresIn: process.env.JWT_EXPIRES_IN || "7d",
       });
 
+      // Log user activity
+      await logUserActivity(user.id, "login", {
+        email: user.email,
+        userAgent: req.get('User-Agent'),
+        timestamp: new Date()
+      }, req);
+
       res.json({
         message: "Login successful",
         user: {
@@ -147,6 +156,7 @@ router.post(
           email: user.email,
           avatar: user.avatar,
           isGuest: user.isGuest,
+          role: user.role,
           createdAt: user.createdAt,
         },
         token,

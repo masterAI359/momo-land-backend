@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
@@ -18,7 +18,14 @@ export const metadata: Metadata = {
     description: "ライブチャットの体験記を共有し、ユーザー同士の交流を促進するコミュニティサイト",
     type: "website",
   },
-    generator: 'v0.dev'
+  generator: 'angel'
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
@@ -33,9 +40,11 @@ export default function RootLayout({
       </head>
       <body className={inter.className} suppressHydrationWarning={true}>
         <AuthProvider>
-          <div className="min-h-screen flex flex-col bg-gray-50">
+          <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
             <Header />
-            <main className="flex-1">{children}</main>
+            <div className="flex flex-col flex-1 max-w-full overflow-x-hidden mt-16">
+              {children}
+            </div>
             <Footer />
           </div>
           <Toaster />
