@@ -14,6 +14,14 @@ import {
   NavigationMenuLink
 } from "@/components/ui/navigation-menu"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -30,6 +38,7 @@ import LoginModal from "./login-modal"
 import { useAuth } from "@/lib/auth"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 
 export default function Header() {
   const [showReportModal, setShowReportModal] = useState(false)
@@ -110,136 +119,132 @@ export default function Header() {
 
       {/* Admin Navigation */}
       {isAdmin && (
-        <NavigationMenuItem>
-          <NavigationMenuTrigger className="gap-2">
-            <Shield className="w-4 h-4" />
-            <span className="hidden sm:inline">管理</span>
-          </NavigationMenuTrigger>
-          <NavigationMenuContent>
-            <div className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-              <div className="col-span-2">
-                <div className="mb-2 flex items-center space-x-2">
-                  <Shield className="w-4 h-4 text-red-600" />
-                  <h3 className="text-sm font-medium">管理者機能</h3>
-                  <Badge variant="outline" className="text-xs">
-                    {user.role}
-                  </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="gap-2">
+              <Shield className="w-4 h-4" />
+              <span className="hidden sm:inline">管理</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="end">
+            <DropdownMenuLabel className="flex items-center space-x-2">
+              <Shield className="w-4 h-4 text-red-600" />
+              <span>管理者機能</span>
+              <Badge variant="outline" className="text-xs">
+                {user.role}
+              </Badge>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem asChild>
+              <Link href="/admin" className="flex items-center space-x-2">
+                <Shield className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">ダッシュボード</div>
+                  <div className="text-xs text-muted-foreground">システム統計と概要</div>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  システム管理とユーザー管理機能
-                </p>
-              </div>
-
-              <Link
-                href="/admin"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">ダッシュボード</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  システム統計と概要
-                </p>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/users"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">ユーザー管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  ユーザー一覧と管理
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/users" className="flex items-center space-x-2">
+                <Users className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">ユーザー管理</div>
+                  <div className="text-xs text-muted-foreground">ユーザー一覧と管理</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/posts"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">投稿管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  投稿の管理とモデレーション
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/posts" className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">投稿管理</div>
+                  <div className="text-xs text-muted-foreground">投稿の管理とモデレーション</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/comments"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">コメント管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  コメントの管理とモデレーション
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/comments" className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">コメント管理</div>
+                  <div className="text-xs text-muted-foreground">コメントの管理とモデレーション</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/chat"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">チャット管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  チャットルームとメッセージ管理
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/chat" className="flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">チャット管理</div>
+                  <div className="text-xs text-muted-foreground">チャットルームとメッセージ管理</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/artists"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">アーティスト管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  女性アーティストランキング管理
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/artists" className="flex items-center space-x-2">
+                <TrendingUp className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">アーティスト管理</div>
+                  <div className="text-xs text-muted-foreground">女性アーティストランキング管理</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/monitoring"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">システム監視</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  システム状態と活動監視
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/monitoring" className="flex items-center space-x-2">
+                <Activity className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">システム監視</div>
+                  <div className="text-xs text-muted-foreground">システム状態と活動監視</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/reports"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">報告管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  ユーザー報告の確認と処理
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/reports" className="flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">報告管理</div>
+                  <div className="text-xs text-muted-foreground">ユーザー報告の確認と処理</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              <Link
-                href="/admin/permissions"
-                className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-              >
-                <div className="text-sm font-medium leading-none">権限管理</div>
-                <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                  ユーザーロールと権限の管理
-                </p>
+            <DropdownMenuItem asChild>
+              <Link href="/admin/permissions" className="flex items-center space-x-2">
+                <Shield className="w-4 h-4" />
+                <div>
+                  <div className="font-medium">権限管理</div>
+                  <div className="text-xs text-muted-foreground">ユーザーロールと権限の管理</div>
+                </div>
               </Link>
+            </DropdownMenuItem>
 
-              {user.role === "SUPER_ADMIN" && (
-                <Link
-                  href="/admin/settings"
-                  className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                >
-                  <div className="text-sm font-medium leading-none">システム設定</div>
-                  <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                    システム設定とコンフィグ
-                  </p>
+            {user.role === "SUPER_ADMIN" && (
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings" className="flex items-center space-x-2">
+                  <Settings className="w-4 h-4" />
+                  <div>
+                    <div className="font-medium">システム設定</div>
+                    <div className="text-xs text-muted-foreground">システム設定とコンフィグ</div>
+                  </div>
                 </Link>
-              )}
-            </div>
-          </NavigationMenuContent>
-        </NavigationMenuItem>
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </>
   )
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
+    <header className="bg-white shadow-sm fixed mt-0 z-50 w-full max-w-full overflow-x-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -273,8 +278,15 @@ export default function Header() {
             {user ? (
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-2 px-3 py-1 bg-pink-50 rounded-full">
-                  <User className="w-4 h-4 text-pink-600" />
-                  <span className="text-sm font-medium text-pink-700">{user.nickname}</span>
+                  <Avatar className="w-6 h-6 text-pink-600">
+                    <AvatarImage src={user.avatar ? user.avatar : "/images/avatar/default.png"} />
+                    <AvatarFallback>{user.nickname.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  {
+                    !isAdmin && (
+                      <span className="text-sm font-medium text-pink-700">{user.nickname}</span>
+                    )
+                  }
                   {user.isGuest && (
                     <Badge variant="secondary" className="text-xs">
                       ゲスト

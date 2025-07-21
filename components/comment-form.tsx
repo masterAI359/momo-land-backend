@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast"
 import api from "@/api/axios"
 import { Badge } from "@/components/ui/badge"
 import { LoadingButton } from "@/components/ui/loading-states"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface CommentFormProps {
   postId: string
@@ -73,6 +74,7 @@ export default function CommentForm({ postId, onCommentAdded }: CommentFormProps
         author: {
           id: user.id,
           nickname: user.nickname,
+          avatar: user.avatar ? user.avatar : "/images/avatar/default.png",
         },
       }
 
@@ -126,7 +128,10 @@ export default function CommentForm({ postId, onCommentAdded }: CommentFormProps
         </CardTitle>
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <User className="w-4 h-4" />
+            <Avatar>
+              <AvatarImage src={user.avatar ? user.avatar : "/images/avatar/default.png"} />
+              <AvatarFallback>{user.nickname.charAt(0)}</AvatarFallback>
+            </Avatar>
             <span>{user.nickname}</span>
             {user.isGuest && (
               <Badge variant="secondary" className="text-xs">

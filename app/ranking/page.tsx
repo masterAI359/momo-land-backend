@@ -4,13 +4,15 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Heart, MessageSquare, Clock, User, Trophy, Medal, Award, Wifi, WifiOff, RefreshCw } from "lucide-react"
+import { Heart, MessageSquare, Clock, Trophy, Medal, Award, Wifi, WifiOff, RefreshCw, Eye } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth"
 import api from "@/api/axios"
+import { Skeleton } from "@/components/ui/skeleton"
 import socketService from "@/lib/socket"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 interface RankingPost {
   id: string
@@ -25,6 +27,7 @@ interface RankingPost {
   author: {
     id: string
     nickname: string
+    avatar: string
   }
   rank: number
 }
@@ -183,7 +186,7 @@ export default function RankingPage() {
       case 3:
         return <Award className="w-6 h-6 text-amber-600" />
       default:
-        return <span className="w-6 h-6 flex items-center justify-center text-lg font-bold text-gray-500">#{rank}</span>
+        return <span className="w-6 h-6 flex items-center justify-center text-lg font-bold text-gray-500">{rank}</span>
     }
   }
 
@@ -245,9 +248,36 @@ export default function RankingPage() {
 
         {/* Content */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">ランキングデータを読み込み中...</p>
+          <div className="space-y-6">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Card key={index} className="w-full">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-center w-12 h-12">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <Skeleton className="h-8 w-16" />
+                          <Skeleton className="h-8 w-16" />
+                          <Skeleton className="h-8 w-16" />
+                        </div>
+                        <Skeleton className="h-8 w-20" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         ) : (
           <div className="space-y-6">
@@ -262,11 +292,10 @@ export default function RankingPage() {
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center space-x-3">
-                        {getRankIcon(post.rank)}
+                        <div className="flex items-center space-x-2 w-10 h-10 border-2 border-pink-100 bg-pink-50 rounded-full justify-center items-center">
+                          {getRankIcon(post.rank)}
+                        </div>
                         <div>
-                          <Badge className={`${getRankBadgeColor(post.rank)} mb-2`}>
-                            #{post.rank}
-                          </Badge>
                           <Link href={`/blogs/${post.id}`}>
                             <CardTitle className="text-lg hover:text-pink-600 transition-colors line-clamp-2">
                               {post.title}
@@ -274,7 +303,10 @@ export default function RankingPage() {
                           </Link>
                           <CardDescription className="flex items-center space-x-4 mt-2">
                             <span className="flex items-center space-x-1">
-                              <User className="w-4 h-4" />
+                              <Avatar>
+                                <AvatarImage src={post.author.avatar ? post.author.avatar : "/images/avatar/default.png"} />
+                                <AvatarFallback>{post.author.nickname.charAt(0)}</AvatarFallback>
+                              </Avatar>
                               <span>{post.author.nickname}</span>
                             </span>
                             <span className="flex items-center space-x-1">
@@ -304,12 +336,12 @@ export default function RankingPage() {
                           <span>{post.commentsCount}</span>
                         </div>
                         <div className="flex items-center space-x-1 text-gray-500">
-                          <Clock className="w-4 h-4" />
+                          <Eye className="w-4 h-4 text-blue-500" />
                           <span>{post.viewCount} 回閲覧</span>
                         </div>
                       </div>
                       <Link href={`/blogs/${post.id}`}>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="hover:bg-pink-50 hover:text-pink-600 text-sm">
                           詳細を見る
                         </Button>
                       </Link>

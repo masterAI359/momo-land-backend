@@ -35,6 +35,7 @@ import {
   LineChart,
   RefreshCw
 } from "lucide-react"
+import {AgCharts} from "ag-charts-react"
 
 interface DashboardStats {
   users: {
@@ -75,6 +76,13 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Reset loading state when component unmounts
+  useEffect(() => {
+    return () => {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     // Check if user is admin
     if (!user) {
@@ -94,13 +102,27 @@ export default function AdminDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const response = await api.get("/admin/dashboard")
+      const response = await api.get("/admin/dashboard", {
+        timeout: 10000 // 10 second timeout
+      })
       setStats(response.data.stats)
     } catch (error: any) {
       console.error("Failed to fetch dashboard data:", error)
-      setError(error.response?.data?.error || "Failed to load dashboard data")
+      
+      let errorMessage = "ダッシュボードデータの読み込みに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
     } finally {
-      setLoading(false)
+      // Ensure state is always reset
+      setTimeout(() => setLoading(false), 100)
     }
   }
 
@@ -164,8 +186,16 @@ export default function AdminDashboard() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button onClick={fetchDashboardData} className="mt-4">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button 
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            fetchDashboardData()
+          }} 
+          className="mt-4"
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           再試行
         </Button>
       </div>
@@ -192,8 +222,17 @@ export default function AdminDashboard() {
               <Shield className="h-4 w-4 mr-1" />
               {user?.role}
             </Badge>
-            <Button onClick={fetchDashboardData} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                fetchDashboardData()
+              }} 
+              variant="outline" 
+              size="sm"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               更新
             </Button>
           </div>
@@ -343,37 +382,214 @@ export default function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <Card>
               <CardHeader>
-                <CardTitle>ユーザー統計</CardTitle>
+                <CardTitle>ユーザー状態分布</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">総ユーザー数</span>
-                    <span className="font-semibold">{stats.users.total}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">アクティブユーザー</span>
-                    <span className="font-semibold text-green-600">{stats.users.active}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">停止中ユーザー</span>
-                    <span className="font-semibold text-red-600">{stats.users.suspended}</span>
-                  </div>
+                <div className="h-80">
+                  <AgCharts
+                    options={{
+                      data: [
+                        {
+                          category: 'アクティブ',
+                          value: stats.users.active,
+                          color: '#10b981'
+                        },
+                        {
+                          category: '非アクティブ',
+                          value: stats.users.total - stats.users.active - stats.users.suspended,
+                          color: '#6b7280'
+                        },
+                        {
+                          category: '停止中',
+                          value: stats.users.suspended,
+                          color: '#ef4444'
+                        }
+                      ],
+                      series: [{
+                        type: 'donut' as const,
+                        angleKey: 'value',
+                        innerRadiusRatio: 0.6,
+                        fills: ['#10b981', '#6b7280', '#ef4444'],
+                        strokes: ['#ffffff', '#ffffff', '#ffffff'],
+                        strokeWidth: 2,
+                        calloutLabelKey: 'category',
+                        sectorLabelKey: 'value',
+                        calloutLabel: {
+                          enabled: true,
+                          fontSize: 12,
+                          color: '#374151'
+                        },
+                        sectorLabel: {
+                          enabled: true,
+                          fontSize: 14,
+                          fontWeight: 'bold',
+                          color: '#ffffff',
+                          formatter: ({ value }: any) => `${value}`
+                        },
+                        tooltip: {
+                          renderer: ({ datum }: any) => ({
+                            content: `${datum.category}: ${datum.value}人 (${((datum.value / stats.users.total) * 100).toFixed(1)}%)`
+                          })
+                        },
+                        shadow: {
+                          enabled: true,
+                          color: 'rgba(0, 0, 0, 0.1)',
+                          xOffset: 0,
+                          yOffset: 2,
+                          blur: 4
+                        }
+                      }],
+                      background: {
+                        fill: 'transparent'
+                      },
+                      legend: {
+                        enabled: true,
+                        position: 'bottom' as const,
+                        spacing: 20,
+                        item: {
+                          label: {
+                            fontSize: 12,
+                            color: '#374151'
+                          },
+                          marker: {
+                            size: 12
+                          }
+                        }
+                      }
+                    } as any}
+                  />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>ユーザー統計詳細</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-gray-900 mb-2">{stats.users.total}</div>
+                    <div className="text-sm text-gray-600">総ユーザー数</div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-800">アクティブユーザー</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-green-600">{stats.users.active}</div>
+                        <div className="text-xs text-green-600">
+                          {((stats.users.active / stats.users.total) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-gray-800">非アクティブユーザー</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-600">{stats.users.total - stats.users.active - stats.users.suspended}</div>
+                        <div className="text-xs text-gray-600">
+                          {(((stats.users.total - stats.users.active - stats.users.suspended) / stats.users.total) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-red-800">停止中ユーザー</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-red-600">{stats.users.suspended}</div>
+                        <div className="text-xs text-red-600">
+                          {((stats.users.suspended / stats.users.total) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1">
+            <Card>
               <CardHeader>
                 <CardTitle>ユーザー登録傾向</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 flex items-center justify-center text-gray-500">
-                  <LineChart className="h-8 w-8 mr-2" />
-                  <span>グラフ表示機能は開発中です</span>
+                <div className="h-96">
+                  <AgCharts
+                    options={{
+                      data: stats.users.registrationTrend.map(item => ({
+                        date: new Date(item.createdAt).toLocaleDateString('ja-JP', { 
+                          month: 'short', 
+                          day: 'numeric' 
+                        }),
+                        registrations: item._count.id,
+                        fullDate: item.createdAt
+                      })),
+                                              series: [{
+                          type: 'area' as const,
+                          xKey: 'date',
+                          yKey: 'registrations',
+                          fill: '#3b82f6',
+                          fillOpacity: 0.1,
+                          stroke: '#3b82f6',
+                          strokeWidth: 2,
+                          marker: {
+                            fill: '#3b82f6',
+                            stroke: '#ffffff',
+                            strokeWidth: 2,
+                            size: 5,
+                          },
+                          shadow: {
+                            enabled: true,
+                            color: 'rgba(59, 130, 246, 0.3)',
+                            xOffset: 0,
+                            yOffset: 2,
+                            blur: 4
+                          }
+                        }],
+                      axes: [
+                        {
+                          type: 'category' as const,
+                          position: 'bottom' as const,
+                          title: {
+                            text: '日付'
+                          },
+                          label: {
+                            rotation: 45
+                          }
+                        },
+                        {
+                          type: 'number' as const,
+                          position: 'left' as const,
+                          title: {
+                            text: '登録者数'
+                          },
+                          label: {
+                            formatter: ({ value }: any) => `${value}人`
+                          }
+                        }
+                      ],
+                      background: {
+                        fill: 'transparent'
+                      },
+                      legend: {
+                        enabled: false
+                      }
+                    } as any}
+                  />
                 </div>
               </CardContent>
             </Card>

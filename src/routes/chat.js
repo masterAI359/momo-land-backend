@@ -37,6 +37,7 @@ router.get("/rooms", authenticateToken, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
               },
             },
           },
@@ -157,6 +158,7 @@ router.get("/rooms/:id", authenticateToken, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
               },
             },
           },
@@ -170,6 +172,7 @@ router.get("/rooms/:id", authenticateToken, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
               },
             },
           },

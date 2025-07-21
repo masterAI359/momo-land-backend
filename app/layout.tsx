@@ -42,11 +42,9 @@ export default function RootLayout({
         <AuthProvider>
           <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
             <Header />
-            <main className="flex-1 flex flex-col">
-              <div className="flex flex-col flex-1 max-w-full overflow-x-hidden">
-                {children}
-              </div>
-            </main>
+            <div className="flex flex-col flex-1 max-w-full overflow-x-hidden mt-16">
+              {children}
+            </div>
             <Footer />
           </div>
           <Toaster />

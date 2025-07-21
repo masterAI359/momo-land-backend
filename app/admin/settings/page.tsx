@@ -198,7 +198,7 @@ export default function AdminSettingsPage() {
     }
     
     if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
-      router.push("/")
+      router.push("/admin")
       return
     }
   }, [user, router])

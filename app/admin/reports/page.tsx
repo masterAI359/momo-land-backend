@@ -57,6 +57,7 @@ import {
   PieChart,
   BarChart3
 } from "lucide-react"
+import {AgCharts} from "ag-charts-react"
 
 interface Report {
   id: string
@@ -145,6 +146,37 @@ export default function AdminReportsPage() {
     assignedTo: ""
   })
   const [availableAdmins, setAvailableAdmins] = useState<any[]>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
+
+  // Reset submitting state when component mounts or unmounts
+  useEffect(() => {
+    return () => {
+      setIsSubmitting(false)
+      setIsLoadingAdmins(false)
+    }
+  }, [])
+
+  // Reset states when tab changes
+  useEffect(() => {
+    setIsSubmitting(false)
+    setIsLoadingAdmins(false)
+    setError(null)
+  }, [activeTab])
+
+  // Function to reset all form states
+  const resetAllStates = () => {
+    setIsSubmitting(false)
+    setIsLoadingAdmins(false)
+    setError(null)
+    setShowUpdateStatus(false)
+    setShowAssignReport(false)
+    setShowReportDetails(false)
+    setShowDeleteReport(false)
+    setSelectedReport(null)
+    setUpdateForm({ status: "", priority: "", resolution: "", notes: "" })
+    setAssignForm({ assignedTo: "" })
+  }
 
   useEffect(() => {
     if (!user) {
@@ -168,11 +200,24 @@ export default function AdminReportsPage() {
     try {
       setLoading(true)
       setError(null)
-      const response = await api.get("/admin/reports/stats")
+      const response = await api.get("/admin/reports/stats", {
+        timeout: 10000 // 10 second timeout for stats
+      })
       setStats(response.data.stats)
     } catch (error: any) {
       console.error("Failed to fetch report stats:", error)
-      setError(error.response?.data?.error || "Failed to load report statistics")
+      
+      let errorMessage = "報告統計の読み込みに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -193,12 +238,25 @@ export default function AdminReportsPage() {
         sortOrder: filters.sortOrder
       })
 
-      const response = await api.get(`/admin/reports?${params}`)
-      setReports(response.data.reports)
-      setTotalPages(response.data.pagination.pages)
+      const response = await api.get(`/admin/reports?${params}`, {
+        timeout: 10000 // 10 second timeout for reports list
+      })
+      setReports(response.data.reports || [])
+      setTotalPages(response.data.pagination?.pages || 1)
     } catch (error: any) {
       console.error("Failed to fetch reports:", error)
-      setError(error.response?.data?.error || "Failed to load reports")
+      
+      let errorMessage = "報告一覧の読み込みに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -206,37 +264,103 @@ export default function AdminReportsPage() {
 
   const fetchAvailableAdmins = async () => {
     try {
-      const response = await api.get("/admin/users?role=ADMIN&role=MODERATOR&role=SUPER_ADMIN&limit=100")
-      setAvailableAdmins(response.data.users || [])
-    } catch (error) {
+      setIsLoadingAdmins(true)
+      setError(null)
+      
+      // Try multiple endpoints as fallback
+      let response;
+      try {
+        response = await api.get("/admin/users", { 
+          params: { 
+            role: ["ADMIN", "MODERATOR", "SUPER_ADMIN"],
+            limit: 100 
+          },
+          timeout: 5000
+        })
+      } catch (firstError: any) {
+        console.warn("First admin endpoint failed, trying alternative:", firstError.message)
+        // Fallback to simpler endpoint
+        response = await api.get("/admin/users", {
+          timeout: 5000
+        })
+      }
+      
+      const users = response.data.users || response.data || []
+      // Filter admin users on frontend if backend doesn't filter
+      const adminUsers = users.filter((user: any) => 
+        ['ADMIN', 'MODERATOR', 'SUPER_ADMIN'].includes(user.role)
+      )
+      setAvailableAdmins(adminUsers)
+    } catch (error: any) {
       console.error("Failed to fetch available admins:", error)
+      setError("管理者リストの取得に失敗しました")
+      // Set fallback admin list or current user
+      if (user && ['ADMIN', 'MODERATOR', 'SUPER_ADMIN'].includes(user.role)) {
+        setAvailableAdmins([{
+          id: user.id,
+          nickname: user.nickname,
+          role: user.role
+        }])
+      }
+    } finally {
+      // Ensure state is always reset
+      setTimeout(() => setIsLoadingAdmins(false), 100)
     }
   }
 
   const handleUpdateReport = async () => {
-    if (!selectedReport) return
+    if (!selectedReport || isSubmitting) return
 
     try {
-      const response = await api.put(`/admin/reports/${selectedReport.id}`, updateForm)
+      setIsSubmitting(true)
+      setError(null) // Clear previous errors
+      
+      const response = await api.put(`/admin/reports/${selectedReport.id}`, updateForm, {
+        timeout: 8000 // 8 second timeout
+      })
       
       // Update the report in the list
       setReports(prevReports => 
         prevReports.map(report => 
-          report.id === selectedReport.id ? response.data.report : report
+          report.id === selectedReport.id ? {
+            ...report,
+            ...response.data.report
+          } : report
         )
       )
       
       setShowUpdateStatus(false)
       setUpdateForm({ status: "", priority: "", resolution: "", notes: "" })
       setSelectedReport(null)
+      setError(null) // Clear any previous errors
       
       // Refresh stats if we're on overview tab
       if (activeTab === "overview") {
         fetchStats()
       }
+      
+      console.log("Report updated successfully")
     } catch (error: any) {
       console.error("Failed to update report:", error)
-      setError(error.response?.data?.error || "Failed to update report")
+      
+      let errorMessage = "報告の更新に失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "報告が見つかりません"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
+      
+      // Don't close the modal so user can try again
+    } finally {
+      // Ensure state is always reset
+      setTimeout(() => setIsSubmitting(false), 100)
     }
   }
 
@@ -265,24 +389,55 @@ export default function AdminReportsPage() {
   }
 
   const handleAssignReport = async () => {
-    if (!selectedReport) return
+    if (!selectedReport || !assignForm.assignedTo || isSubmitting) return
 
     try {
-      const response = await api.post(`/admin/reports/${selectedReport.id}/assign`, assignForm)
+      setIsSubmitting(true)
+      setError(null) // Clear previous errors
+      
+      const response = await api.post(`/admin/reports/${selectedReport.id}/assign`, assignForm, {
+        timeout: 8000 // 8 second timeout
+      })
       
       // Update the report in the list
       setReports(prevReports => 
         prevReports.map(report => 
-          report.id === selectedReport.id ? response.data.report : report
+          report.id === selectedReport.id ? { 
+            ...report, 
+            assignedTo: assignForm.assignedTo,
+            ...response.data.report 
+          } : report
         )
       )
       
       setShowAssignReport(false)
       setAssignForm({ assignedTo: "" })
       setSelectedReport(null)
+      setError(null) // Clear any previous errors
+      
+      // Show success message
+      console.log("Report assigned successfully")
     } catch (error: any) {
       console.error("Failed to assign report:", error)
-      setError(error.response?.data?.error || "Failed to assign report")
+      
+      let errorMessage = "報告の割り当てに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "報告が見つかりません"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
+      
+      // Don't close the modal so user can try again
+    } finally {
+      // Ensure state is always reset
+      setTimeout(() => setIsSubmitting(false), 100)
     }
   }
 
@@ -313,6 +468,46 @@ export default function AdminReportsPage() {
       case "spam": return Flag
       case "other": return MessageSquare
       default: return AlertTriangle
+    }
+  }
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "technical": return "技術的問題"
+      case "inappropriate": return "不適切なコンテンツ"
+      case "spam": return "スパム"
+      case "other": return "その他"
+      default: return type
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "LOW": return "#6b7280"
+      case "MEDIUM": return "#f59e0b"
+      case "HIGH": return "#f97316"
+      case "URGENT": return "#ef4444"
+      default: return "#6b7280"
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "pending": return "未対応"
+      case "reviewed": return "確認中"
+      case "resolved": return "解決済み"
+      case "dismissed": return "却下"
+      default: return status
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending": return "#f59e0b"
+      case "reviewed": return "#3b82f6"
+      case "resolved": return "#10b981"
+      case "dismissed": return "#6b7280"
+      default: return "#6b7280"
     }
   }
 
@@ -349,11 +544,17 @@ export default function AdminReportsPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button onClick={() => {
-          if (activeTab === "overview") fetchStats()
-          else fetchReports()
-        }} className="mt-4">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button 
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            if (activeTab === "overview") fetchStats()
+            else fetchReports()
+          }} 
+          className="mt-4"
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           再試行
         </Button>
       </div>
@@ -374,11 +575,18 @@ export default function AdminReportsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <Button onClick={() => {
-              if (activeTab === "overview") fetchStats()
-              else fetchReports()
-            }} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                if (activeTab === "overview") fetchStats()
+                else fetchReports()
+              }} 
+              variant="outline" 
+              size="sm"
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               更新
             </Button>
           </div>
@@ -462,16 +670,61 @@ export default function AdminReportsPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {stats.breakdown.byType.map((item) => (
-                        <div key={item.type} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                            <span className="text-sm capitalize">{item.type}</span>
-                          </div>
-                          <span className="font-semibold">{item._count.id}</span>
-                        </div>
-                      ))}
+                    <div className="h-80">
+                      <AgCharts
+                        options={{
+                          data: stats.breakdown.byType.map(item => ({
+                            type: item.type,
+                            count: item._count.id,
+                            label: getTypeLabel(item.type)
+                          })),
+                          series: [{
+                            type: 'donut' as const,
+                            angleKey: 'count',
+                            innerRadiusRatio: 0.6,
+                            fills: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+                            strokes: ['#ffffff', '#ffffff', '#ffffff', '#ffffff', '#ffffff'],
+                            strokeWidth: 2,
+                            calloutLabelKey: 'label',
+                            sectorLabelKey: 'count',
+                            calloutLabel: {
+                              enabled: true,
+                              fontSize: 11,
+                              color: '#374151'
+                            },
+                            sectorLabel: {
+                              enabled: true,
+                              fontSize: 12,
+                              fontWeight: 'bold',
+                              color: '#ffffff'
+                            },
+                            shadow: {
+                              enabled: true,
+                              color: 'rgba(0, 0, 0, 0.1)',
+                              xOffset: 0,
+                              yOffset: 2,
+                              blur: 4
+                            }
+                          }],
+                          background: {
+                            fill: 'transparent'
+                          },
+                          legend: {
+                            enabled: true,
+                            position: 'bottom' as const,
+                            spacing: 16,
+                            item: {
+                              label: {
+                                fontSize: 11,
+                                color: '#374151'
+                              },
+                              marker: {
+                                size: 10
+                              }
+                            }
+                          }
+                        } as any}
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -485,17 +738,67 @@ export default function AdminReportsPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {stats.breakdown.byPriority.map((item) => (
-                        <div key={item.priority} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getPriorityBadge(item.priority)}>
-                              {item.priority}
-                            </Badge>
-                          </div>
-                          <span className="font-semibold">{item._count.id}</span>
-                        </div>
-                      ))}
+                    <div className="h-80">
+                      <AgCharts
+                        options={{
+                          data: stats.breakdown.byPriority.map(item => ({
+                            priority: item.priority,
+                            count: item._count.id,
+                            color: getPriorityColor(item.priority)
+                          })),
+                          series: [{
+                            type: 'bar' as const,
+                            xKey: 'priority',
+                            yKey: 'count',
+                            fills: stats.breakdown.byPriority.map(item => getPriorityColor(item.priority)),
+                            stroke: '#ffffff',
+                            strokeWidth: 1,
+                            label: {
+                              enabled: true,
+                              fontSize: 12,
+                              fontWeight: 'bold',
+                              color: '#ffffff'
+                            },
+                            shadow: {
+                              enabled: true,
+                              color: 'rgba(0, 0, 0, 0.1)',
+                              xOffset: 0,
+                              yOffset: 2,
+                              blur: 4
+                            }
+                          }],
+                          axes: [
+                            {
+                              type: 'category' as const,
+                              position: 'bottom' as const,
+                              title: {
+                                text: '優先度'
+                              },
+                              label: {
+                                fontSize: 11,
+                                color: '#374151'
+                              }
+                            },
+                            {
+                              type: 'number' as const,
+                              position: 'left' as const,
+                              title: {
+                                text: '件数'
+                              },
+                              label: {
+                                fontSize: 11,
+                                color: '#374151'
+                              }
+                            }
+                          ],
+                          background: {
+                            fill: 'transparent'
+                          },
+                          legend: {
+                            enabled: false
+                          }
+                        } as any}
+                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -509,44 +812,188 @@ export default function AdminReportsPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {stats.breakdown.byStatus.map((item) => (
-                        <div key={item.status} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <Badge className={getStatusBadge(item.status)}>
-                              {item.status}
-                            </Badge>
-                          </div>
-                          <span className="font-semibold">{item._count.id}</span>
-                        </div>
-                      ))}
+                    <div className="h-80">
+                      <AgCharts
+                        options={{
+                          data: stats.breakdown.byStatus.map(item => ({
+                            status: item.status,
+                            count: item._count.id,
+                            label: getStatusLabel(item.status),
+                            color: getStatusColor(item.status)
+                          })),
+                          series: [{
+                            type: 'pie' as const,
+                            angleKey: 'count',
+                            fills: stats.breakdown.byStatus.map(item => getStatusColor(item.status)),
+                            strokes: ['#ffffff', '#ffffff', '#ffffff', '#ffffff'],
+                            strokeWidth: 2,
+                            calloutLabelKey: 'label',
+                            sectorLabelKey: 'count',
+                            calloutLabel: {
+                              enabled: true,
+                              fontSize: 11,
+                              color: '#374151'
+                            },
+                            sectorLabel: {
+                              enabled: true,
+                              fontSize: 12,
+                              fontWeight: 'bold',
+                              color: '#ffffff'
+                            },
+                            shadow: {
+                              enabled: true,
+                              color: 'rgba(0, 0, 0, 0.1)',
+                              xOffset: 0,
+                              yOffset: 2,
+                              blur: 4
+                            }
+                          }],
+                          background: {
+                            fill: 'transparent'
+                          },
+                          legend: {
+                            enabled: true,
+                            position: 'bottom' as const,
+                            spacing: 16,
+                            item: {
+                              label: {
+                                fontSize: 11,
+                                color: '#374151'
+                              },
+                              marker: {
+                                size: 10
+                              }
+                            }
+                          }
+                        } as any}
+                      />
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Time Statistics */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>期間別統計</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">{stats.timeframes.last24h}</div>
-                      <p className="text-sm text-gray-600">24時間以内</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <TrendingUp className="h-5 w-5" />
+                      <span>期間別報告数</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      <AgCharts
+                        options={{
+                          data: [
+                            { period: '24時間', count: stats.timeframes.last24h, color: '#3b82f6' },
+                            { period: '7日間', count: stats.timeframes.last7d, color: '#10b981' },
+                            { period: '30日間', count: stats.timeframes.last30d, color: '#8b5cf6' }
+                          ],
+                          series: [{
+                            type: 'bar' as const,
+                            xKey: 'period',
+                            yKey: 'count',
+                            fills: ['#3b82f6', '#10b981', '#8b5cf6'],
+                            stroke: '#ffffff',
+                            strokeWidth: 1,
+                            label: {
+                              enabled: true,
+                              fontSize: 14,
+                              fontWeight: 'bold',
+                              color: '#ffffff'
+                            },
+                            shadow: {
+                              enabled: true,
+                              color: 'rgba(0, 0, 0, 0.15)',
+                              xOffset: 0,
+                              yOffset: 3,
+                              blur: 6
+                            }
+                          }],
+                          axes: [
+                            {
+                              type: 'category' as const,
+                              position: 'bottom' as const,
+                              title: {
+                                text: '期間'
+                              },
+                              label: {
+                                fontSize: 12,
+                                color: '#374151'
+                              }
+                            },
+                            {
+                              type: 'number' as const,
+                              position: 'left' as const,
+                              title: {
+                                text: '報告数'
+                              },
+                              label: {
+                                fontSize: 12,
+                                color: '#374151'
+                              }
+                            }
+                          ],
+                          background: {
+                            fill: 'transparent'
+                          },
+                          legend: {
+                            enabled: false
+                          }
+                        } as any}
+                      />
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-green-600">{stats.timeframes.last7d}</div>
-                      <p className="text-sm text-gray-600">7日以内</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Target className="h-5 w-5" />
+                      <span>解決率 & 統計</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      <div className="text-center">
+                        <div className="text-4xl font-bold text-green-600 mb-2">{stats.overview.resolutionRate}%</div>
+                        <p className="text-sm text-gray-600">全体解決率</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="text-xl font-bold text-blue-600">{stats.timeframes.last24h}</div>
+                          <p className="text-xs text-blue-700 font-medium">24時間</p>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-xl font-bold text-green-600">{stats.timeframes.last7d}</div>
+                          <p className="text-xs text-green-700 font-medium">7日間</p>
+                        </div>
+                        <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="text-xl font-bold text-purple-600">{stats.timeframes.last30d}</div>
+                          <p className="text-xs text-purple-700 font-medium">30日間</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                          <span className="text-sm font-medium text-gray-700">総報告数</span>
+                          <span className="font-bold text-gray-900">{stats.overview.total}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                          <span className="text-sm font-medium text-yellow-700">未対応</span>
+                          <span className="font-bold text-yellow-600">{stats.overview.pending}</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                          <span className="text-sm font-medium text-green-700">解決済み</span>
+                          <span className="font-bold text-green-600">{stats.overview.resolved}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">{stats.timeframes.last30d}</div>
-                      <p className="text-sm text-gray-600">30日以内</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             </>
           )}
         </TabsContent>
@@ -858,7 +1305,14 @@ export default function AdminReportsPage() {
       </Dialog>
 
       {/* Update Status Modal */}
-      <Dialog open={showUpdateStatus} onOpenChange={setShowUpdateStatus}>
+      <Dialog open={showUpdateStatus} onOpenChange={(open) => {
+        setShowUpdateStatus(open)
+        if (!open) {
+          setError(null) // Clear error when modal closes
+          setIsSubmitting(false)
+          setUpdateForm({ status: "", priority: "", resolution: "", notes: "" })
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>ステータス更新</DialogTitle>
@@ -866,7 +1320,11 @@ export default function AdminReportsPage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="updateStatus">ステータス</Label>
-              <Select value={updateForm.status} onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}>
+              <Select 
+                value={updateForm.status} 
+                onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}
+                disabled={isSubmitting}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -881,7 +1339,11 @@ export default function AdminReportsPage() {
 
             <div>
               <Label htmlFor="updatePriority">優先度</Label>
-              <Select value={updateForm.priority} onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}>
+              <Select 
+                value={updateForm.priority} 
+                onValueChange={(value) => setUpdateForm({ ...updateForm, priority: value })}
+                disabled={isSubmitting}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -901,6 +1363,7 @@ export default function AdminReportsPage() {
                 placeholder="問題の解決方法や対応内容を入力..."
                 value={updateForm.resolution}
                 onChange={(e) => setUpdateForm({ ...updateForm, resolution: e.target.value })}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -911,14 +1374,42 @@ export default function AdminReportsPage() {
                 placeholder="内部用のメモや備考..."
                 value={updateForm.notes}
                 onChange={(e) => setUpdateForm({ ...updateForm, notes: e.target.value })}
+                disabled={isSubmitting}
               />
             </div>
 
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex space-x-2">
-              <Button onClick={handleUpdateReport} className="flex-1">
-                更新
+              <Button 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleUpdateReport()
+                }} 
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    更新中...
+                  </>
+                ) : (
+                  '更新'
+                )}
               </Button>
-              <Button variant="outline" onClick={() => setShowUpdateStatus(false)} className="flex-1">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowUpdateStatus(false)} 
+                disabled={isSubmitting}
+                className="flex-1"
+              >
                 キャンセル
               </Button>
             </div>
@@ -927,7 +1418,15 @@ export default function AdminReportsPage() {
       </Dialog>
 
       {/* Assign Report Modal */}
-      <Dialog open={showAssignReport} onOpenChange={setShowAssignReport}>
+      <Dialog open={showAssignReport} onOpenChange={(open) => {
+        setShowAssignReport(open)
+        if (!open) {
+          setError(null) // Clear error when modal closes
+          setIsSubmitting(false)
+          setIsLoadingAdmins(false)
+          setAssignForm({ assignedTo: "" })
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>担当者割り当て</DialogTitle>
@@ -935,25 +1434,69 @@ export default function AdminReportsPage() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="assignedTo">担当者</Label>
-              <Select value={assignForm.assignedTo} onValueChange={(value) => setAssignForm({ ...assignForm, assignedTo: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="担当者を選択..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAdmins.map((admin) => (
-                    <SelectItem key={admin.id} value={admin.id}>
-                      {admin.nickname} ({admin.role})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isLoadingAdmins ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-sm text-gray-600">管理者を読み込み中...</span>
+                </div>
+              ) : (
+                <Select 
+                  value={assignForm.assignedTo} 
+                  onValueChange={(value) => setAssignForm({ ...assignForm, assignedTo: value })}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="担当者を選択..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableAdmins.length > 0 ? (
+                      availableAdmins.map((admin) => (
+                        <SelectItem key={admin.id} value={admin.id}>
+                          {admin.nickname} ({admin.role})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        管理者が見つかりません
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex space-x-2">
-              <Button onClick={handleAssignReport} className="flex-1">
-                割り当て
+              <Button 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleAssignReport()
+                }} 
+                disabled={isSubmitting || isLoadingAdmins || !assignForm.assignedTo}
+                className="flex-1"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    割り当て中...
+                  </>
+                ) : (
+                  '割り当て'
+                )}
               </Button>
-              <Button variant="outline" onClick={() => setShowAssignReport(false)} className="flex-1">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAssignReport(false)} 
+                disabled={isSubmitting}
+                className="flex-1"
+              >
                 キャンセル
               </Button>
             </div>
