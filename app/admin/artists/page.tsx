@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,14 +26,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { 
+import {
   Users,
   Search,
   Filter,
@@ -160,7 +160,7 @@ interface ArtistRankings {
     featuredArtists: number
     verifiedArtists: number
     period: string
-  category: string
+    category: string
     topScore: number
     avgScore: number
   }
@@ -169,7 +169,7 @@ interface ArtistRankings {
 
 const rankColors = {
   1: "from-yellow-400 to-yellow-600",
-  2: "from-gray-400 to-gray-600", 
+  2: "from-gray-400 to-gray-600",
   3: "from-amber-600 to-amber-800"
 }
 
@@ -183,7 +183,7 @@ const roleConfig = {
 export default function AdminArtistsPage() {
   const { user } = useAuth()
   const router = useRouter()
-  
+
   const [artists, setArtists] = useState<Artist[]>([])
   const [rankings, setRankings] = useState<ArtistRankings | null>(null)
   const [selectedArtist, setSelectedArtist] = useState<ArtistDetails | null>(null)
@@ -192,13 +192,13 @@ export default function AdminArtistsPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  
+
   // Filters
   const [searchTerm, setSearchTerm] = useState("")
   const [isActiveFilter, setIsActiveFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState("createdAt")
   const [sortOrder, setSortOrder] = useState("desc")
-  
+
   // Rankings filters
   const [rankingPeriod, setRankingPeriod] = useState("month")
   const [rankingCategory, setRankingCategory] = useState("activity")
@@ -219,7 +219,7 @@ export default function AdminArtistsPage() {
     reason: ""
   })
   const [submitting, setSubmitting] = useState(false)
-  
+
   // UI states
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [recentlyUpdated, setRecentlyUpdated] = useState<Set<string>>(new Set())
@@ -232,7 +232,7 @@ export default function AdminArtistsPage() {
     }
 
     if (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN") {
-      router.push("/")
+      router.push("/admin")
       return
     }
   }, [user, router])
@@ -241,7 +241,7 @@ export default function AdminArtistsPage() {
     try {
       setLoading(true)
       setError(null)
-      
+
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: "20",
@@ -252,9 +252,9 @@ export default function AdminArtistsPage() {
       })
 
       const response = await api.get(`/admin/artists?${params}`)
-      
+
       if (response.data && response.data.artists) {
-      setArtists(response.data.artists)
+        setArtists(response.data.artists)
         setTotalPages(response.data.pagination?.pages || 1)
       } else {
         setArtists([])
@@ -278,7 +278,7 @@ export default function AdminArtistsPage() {
       })
 
       const response = await api.get(`/admin/artists/rankings/stats?${params}`)
-      
+
       if (response.data) {
         setRankings(response.data)
       }
@@ -293,9 +293,9 @@ export default function AdminArtistsPage() {
   const fetchArtistDetails = async (artistId: string) => {
     try {
       setLoading(true)
-      
+
       const response = await api.get(`/admin/artists/${artistId}`)
-      
+
       if (response.data && response.data.artist) {
         setSelectedArtist(response.data.artist)
         setShowArtistDetails(true)
@@ -318,19 +318,19 @@ export default function AdminArtistsPage() {
 
   const handleUpdateArtistStatus = async () => {
     if (!selectedArtist) return
-    
+
     try {
       setSubmitting(true)
-      
+
       await api.patch(`/admin/artists/${selectedArtist.id}/status`, statusFormData)
-      
+
       setShowStatusModal(false)
       await fetchArtists()
-      
+
       // Show success animation
       setRecentlyUpdated(new Set([selectedArtist.id]))
       setTimeout(() => setRecentlyUpdated(new Set()), 3000)
-      
+
       // Update selected artist if details are open
       if (showArtistDetails) {
         await fetchArtistDetails(selectedArtist.id)
@@ -345,20 +345,20 @@ export default function AdminArtistsPage() {
 
   const handleFeatureArtist = async () => {
     if (!selectedArtist) return
-    
+
     try {
       setSubmitting(true)
-      
+
       await api.patch(`/admin/artists/${selectedArtist.id}/feature`, featureFormData)
-      
+
       setShowFeatureModal(false)
       await fetchArtists()
       await fetchRankings()
-      
+
       // Show success animation
       setRecentlyUpdated(new Set([selectedArtist.id]))
       setTimeout(() => setRecentlyUpdated(new Set()), 3000)
-      
+
       // Update selected artist if details are open
       if (showArtistDetails) {
         await fetchArtistDetails(selectedArtist.id)
@@ -416,7 +416,7 @@ export default function AdminArtistsPage() {
 
   const getArtistBadges = (artist: Artist) => {
     const badges = []
-    
+
     if (artist.interests?.includes("featured_artist")) {
       badges.push({ text: "注目", color: "yellow", icon: Star, gradient: "from-yellow-400 to-yellow-600" })
     }
@@ -429,7 +429,7 @@ export default function AdminArtistsPage() {
     if (artist.role === "ADMIN" || artist.role === "MODERATOR") {
       badges.push({ text: "スタッフ", color: "red", icon: Shield, gradient: "from-red-400 to-red-600" })
     }
-    
+
     return badges
   }
 
@@ -439,7 +439,7 @@ export default function AdminArtistsPage() {
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - date.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
+
     if (diffDays === 1) return "今日"
     if (diffDays === 2) return "昨日"
     if (diffDays <= 7) return `${diffDays}日前`
@@ -459,10 +459,10 @@ export default function AdminArtistsPage() {
   }
 
   const calculateActivityScore = (artist: Artist) => {
-    return (artist.stats.postsCount * 3) + 
-           (artist.stats.commentsCount * 2) + 
-           (artist.stats.likesCount * 1) + 
-           (artist.stats.messagesCount * 0.5)
+    return (artist.stats.postsCount * 3) +
+      (artist.stats.commentsCount * 2) +
+      (artist.stats.likesCount * 1) +
+      (artist.stats.messagesCount * 0.5)
   }
 
   const getActivityLevel = (score: number) => {
@@ -475,24 +475,24 @@ export default function AdminArtistsPage() {
   if (loading && artists.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-100 dark:from-slate-950 dark:via-purple-950 dark:to-pink-950">
-      <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8">
           <div className="space-y-8">
             <div className="flex items-center gap-4">
               <Skeleton className="h-16 w-16 rounded-full" />
               <div className="space-y-2">
                 <Skeleton className="h-10 w-80" />
                 <Skeleton className="h-6 w-96" />
-        </div>
-        </div>
-            
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="space-y-4">
                   <Skeleton className="h-64 rounded-2xl" />
                 </div>
-          ))}
-        </div>
-      </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -506,41 +506,41 @@ export default function AdminArtistsPage() {
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 p-8 text-white">
             <div className="absolute inset-0 bg-grid-white/[0.1] bg-[size:20px_20px]" />
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/80 via-pink-600/80 to-indigo-600/80" />
-        <div className="relative">
+            <div className="relative">
               <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="p-4 bg-white/20 backdrop-blur-sm rounded-2xl">
                       <Users className="h-10 w-10" />
                     </div>
-            <div>
+                    <div>
                       <h1 className="text-5xl font-bold bg-gradient-to-r from-white to-purple-100 bg-clip-text text-transparent">
                         アーティスト管理
-              </h1>
+                      </h1>
                       <p className="text-purple-100 text-xl mt-2">
                         クリエイターコミュニティの管理・サポート
-              </p>
-            </div>
-              </div>
-                  
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex flex-wrap gap-4 text-sm">
                     <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                       <Users className="h-4 w-4" />
                       <span>総アーティスト: {artists.length}</span>
-            </div>
+                    </div>
                     <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                       <Star className="h-4 w-4" />
                       <span>注目: {artists.filter(a => a.interests?.includes("featured_artist")).length}</span>
-          </div>
+                    </div>
                     <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                       <Activity className="h-4 w-4" />
                       <span>アクティブ: {artists.filter(a => a.isActive).length}</span>
-        </div>
-      </div>
-            </div>
-                
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-3">
-                  <Button 
+                  <Button
                     onClick={() => fetchArtists()}
                     variant="secondary"
                     className="bg-white/20 hover:bg-white/30 text-white border-white/20"
@@ -548,27 +548,27 @@ export default function AdminArtistsPage() {
                     <RefreshCw className="h-4 w-4 mr-2" />
                     更新
                   </Button>
-                  
-                  <Button 
+
+                  <Button
                     onClick={() => fetchRankings()}
                     className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold px-6 py-2 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     <Trophy className="h-4 w-4 mr-2" />
                     ランキング更新
                   </Button>
+                </div>
+              </div>
             </div>
-            </div>
-            </div>
-            </div>
+          </div>
 
           {/* Error Alert */}
           {error && (
             <Alert variant="destructive" className="border-red-200 bg-red-50 dark:bg-red-950/20">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setError(null)}
                 className="ml-auto"
               >
@@ -580,23 +580,23 @@ export default function AdminArtistsPage() {
           {/* Tabs */}
           <Tabs defaultValue="artists" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2 h-auto p-2 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
-              <TabsTrigger 
-                value="artists" 
+              <TabsTrigger
+                value="artists"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white py-3 px-6 rounded-lg transition-all duration-200"
               >
                 <div className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   <span className="font-semibold">アーティスト一覧</span>
-            </div>
+                </div>
               </TabsTrigger>
-              <TabsTrigger 
-                value="rankings" 
+              <TabsTrigger
+                value="rankings"
                 className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-yellow-500 data-[state=active]:to-orange-500 data-[state=active]:text-white py-3 px-6 rounded-lg transition-all duration-200"
               >
                 <div className="flex items-center gap-2">
                   <Trophy className="h-5 w-5" />
                   <span className="font-semibold">ランキング</span>
-            </div>
+                </div>
               </TabsTrigger>
             </TabsList>
 
@@ -609,44 +609,44 @@ export default function AdminArtistsPage() {
                     <div className="flex-1">
                       <div className="relative">
                         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
-              <Input
+                        <Input
                           placeholder="アーティストを名前、メール、バイオで検索..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                           className="pl-12 h-12 text-base border-0 bg-white/50 dark:bg-gray-800/50 focus:bg-white dark:focus:bg-gray-800 transition-colors"
                         />
                       </div>
-            </div>
+                    </div>
 
                     <div className="flex flex-wrap gap-3">
                       <Select value={isActiveFilter} onValueChange={setIsActiveFilter}>
                         <SelectTrigger className="w-48 h-12 border-0 bg-white/50 dark:bg-gray-800/50">
                           <SelectValue placeholder="ステータス" />
-                </SelectTrigger>
-                <SelectContent>
+                        </SelectTrigger>
+                        <SelectContent>
                           <SelectItem value="all">全ステータス</SelectItem>
                           <SelectItem value="true">アクティブ</SelectItem>
                           <SelectItem value="false">非アクティブ</SelectItem>
-                </SelectContent>
-              </Select>
-                      
+                        </SelectContent>
+                      </Select>
+
                       <Select value={sortBy} onValueChange={setSortBy}>
                         <SelectTrigger className="w-48 h-12 border-0 bg-white/50 dark:bg-gray-800/50">
                           <SelectValue placeholder="並び順" />
-                </SelectTrigger>
-                <SelectContent>
+                        </SelectTrigger>
+                        <SelectContent>
                           <SelectItem value="createdAt">登録日</SelectItem>
                           <SelectItem value="lastLoginAt">最終ログイン</SelectItem>
                           <SelectItem value="nickname">名前</SelectItem>
                           <SelectItem value="email">メールアドレス</SelectItem>
-                </SelectContent>
-              </Select>
-                      
+                        </SelectContent>
+                      </Select>
+
                       <Select value={sortOrder} onValueChange={setSortOrder}>
                         <SelectTrigger className="w-32 h-12 border-0 bg-white/50 dark:bg-gray-800/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
                           <SelectItem value="desc">
                             <div className="flex items-center gap-2">
                               <ArrowDown className="h-4 w-4" />
@@ -659,12 +659,12 @@ export default function AdminArtistsPage() {
                               昇順
                             </div>
                           </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Artists Grid */}
               {artists.length > 0 ? (
@@ -675,10 +675,10 @@ export default function AdminArtistsPage() {
                     const activityLevel = getActivityLevel(activityScore)
                     const isExpanded = expandedCards.has(artist.id)
                     const isRecent = recentlyUpdated.has(artist.id)
-                    
+
                     return (
-          <Card 
-            key={artist.id} 
+                      <Card
+                        key={artist.id}
                         className={cn(
                           "group hover:shadow-2xl transition-all duration-500 cursor-pointer border-0 overflow-hidden",
                           "bg-gradient-to-br from-white via-white to-purple-50/50 dark:from-gray-900 dark:via-gray-900 dark:to-purple-950/50",
@@ -690,56 +690,56 @@ export default function AdminArtistsPage() {
                         <CardHeader className="pb-4 relative">
                           {/* Background decoration */}
                           <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 via-pink-500/5 to-indigo-500/5 rounded-t-lg" />
-                          
+
                           <div className="relative">
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-3">
                                 <div className="relative">
                                   <Avatar className="h-16 w-16 ring-4 ring-white shadow-lg">
-                    <AvatarImage src={artist.avatar} alt={artist.nickname} />
+                                    <AvatarImage src={artist.avatar} alt={artist.nickname} />
                                     <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xl font-bold">
-                      {artist.nickname.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                                      {artist.nickname.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
                                   {artist.isActive && (
                                     <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse" />
                                   )}
-                    </div>
-                                
+                                </div>
+
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <h3 className="font-bold text-lg truncate group-hover:text-purple-600 transition-colors">
                                       {artist.nickname}
                                     </h3>
-                                    <Badge 
-                                      variant="outline" 
+                                    <Badge
+                                      variant="outline"
                                       className="text-xs font-bold bg-gradient-to-r from-purple-100 to-pink-100 border-purple-200"
                                     >
                                       #{artist.ranking}
                                     </Badge>
-                      </div>
-                                  
+                                  </div>
+
                                   <p className="text-sm text-muted-foreground truncate">
                                     {artist.fullName || artist.email}
                                   </p>
-                                  
+
                                   <div className="flex items-center gap-1 mt-1">
-                                    <Badge 
-                                      variant="outline" 
+                                    <Badge
+                                      variant="outline"
                                       className={cn("text-xs", roleConfig[artist.role as keyof typeof roleConfig]?.color)}
                                     >
                                       {roleConfig[artist.role as keyof typeof roleConfig]?.label}
                                     </Badge>
-                                    <Badge 
-                                      variant="outline" 
+                                    <Badge
+                                      variant="outline"
                                       className={cn("text-xs", activityLevel.color, activityLevel.bg)}
                                     >
                                       {activityLevel.level}
                                     </Badge>
-                      </div>
-                      </div>
-                      </div>
-                              
+                                  </div>
+                                </div>
+                              </div>
+
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -751,7 +751,7 @@ export default function AdminArtistsPage() {
                               >
                                 {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                               </Button>
-                    </div>
+                            </div>
 
                             {/* Badges */}
                             {badges.length > 0 && (
@@ -759,9 +759,9 @@ export default function AdminArtistsPage() {
                                 {badges.map((badge, index) => {
                                   const Icon = badge.icon
                                   return (
-                                    <Badge 
-                                      key={index} 
-                                      variant="outline" 
+                                    <Badge
+                                      key={index}
+                                      variant="outline"
                                       className={cn(
                                         "text-xs font-semibold bg-gradient-to-r text-white border-0 shadow-md",
                                         badge.gradient
@@ -772,11 +772,11 @@ export default function AdminArtistsPage() {
                                     </Badge>
                                   )
                                 })}
-                      </div>
+                              </div>
                             )}
-                    </div>
+                          </div>
                         </CardHeader>
-                        
+
                         <CardContent className="pt-0 space-y-4">
                           {/* Bio */}
                           {artist.bio && (
@@ -784,21 +784,21 @@ export default function AdminArtistsPage() {
                               <p className="text-sm text-muted-foreground line-clamp-2">
                                 {artist.bio}
                               </p>
-                                </div>
+                            </div>
                           )}
-                          
+
                           {/* Stats Grid */}
                           <div className="grid grid-cols-2 gap-3">
                             <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30 rounded-lg p-3 text-center">
                               <div className="text-2xl font-bold text-blue-600">{artist.stats.postsCount}</div>
                               <div className="text-xs text-blue-600/80 font-medium">投稿</div>
-                              </div>
+                            </div>
                             <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/30 rounded-lg p-3 text-center">
                               <div className="text-2xl font-bold text-red-600">{artist.stats.likesCount}</div>
                               <div className="text-xs text-red-600/80 font-medium">いいね</div>
-                                </div>
-                                </div>
-                          
+                            </div>
+                          </div>
+
                           {/* Expanded Content */}
                           {isExpanded && (
                             <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
@@ -806,21 +806,21 @@ export default function AdminArtistsPage() {
                                 <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30 rounded-lg p-3 text-center">
                                   <div className="text-xl font-bold text-green-600">{artist.stats.commentsCount}</div>
                                   <div className="text-xs text-green-600/80 font-medium">コメント</div>
-                              </div>
+                                </div>
                                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30 rounded-lg p-3 text-center">
                                   <div className="text-xl font-bold text-purple-600">{artist.stats.messagesCount}</div>
                                   <div className="text-xs text-purple-600/80 font-medium">メッセージ</div>
-                            </div>
-                        </div>
-                              
+                                </div>
+                              </div>
+
                               {/* Additional Info */}
                               <div className="space-y-2 text-sm text-muted-foreground bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
                                 {artist.location && (
                                   <div className="flex items-center gap-2">
                                     <MapPin className="h-4 w-4 text-gray-400" />
                                     <span>{artist.location}</span>
-                      </div>
-                    )}
+                                  </div>
+                                )}
                                 {artist.occupation && (
                                   <div className="flex items-center gap-2">
                                     <Briefcase className="h-4 w-4 text-gray-400" />
@@ -838,21 +838,21 @@ export default function AdminArtistsPage() {
                                   </div>
                                 )}
                               </div>
-                              
+
                               {/* Activity Score */}
                               <div className="bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg p-3">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-sm font-medium">アクティビティスコア</span>
                                   <span className="text-lg font-bold text-purple-600">{Math.round(activityScore)}</span>
                                 </div>
-                                <Progress 
-                                  value={Math.min(activityScore, 100)} 
+                                <Progress
+                                  value={Math.min(activityScore, 100)}
                                   className="h-2 bg-purple-200"
                                 />
                               </div>
                             </div>
                           )}
-                          
+
                           {/* Status Indicators */}
                           <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
                             <div className="flex gap-2">
@@ -873,14 +873,14 @@ export default function AdminArtistsPage() {
                               {artist.isSuspended && (
                                 <Badge variant="destructive" className="text-xs">停止中</Badge>
                               )}
-                  </div>
-                </div>
+                            </div>
+                          </div>
 
-                {/* Actions */}
+                          {/* Actions */}
                           <div className="flex gap-2 pt-2">
-                  <Button
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 fetchArtistDetails(artist.id)
@@ -889,18 +889,18 @@ export default function AdminArtistsPage() {
                             >
                               <Eye className="h-4 w-4 mr-1" />
                               詳細
-                  </Button>
-                            
+                            </Button>
+
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   onClick={(e) => e.stopPropagation()}
                                   className="bg-gradient-to-r from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 border-purple-200"
-                  >
+                                >
                                   <MoreHorizontal className="h-4 w-4" />
-                  </Button>
+                                </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuItem onClick={() => openStatusModal(artist)}>
@@ -918,12 +918,12 @@ export default function AdminArtistsPage() {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-              </div>
-            </CardContent>
-          </Card>
+                          </div>
+                        </CardContent>
+                      </Card>
                     )
                   })}
-      </div>
+                </div>
               ) : (
                 <Card className="border-0 shadow-xl bg-white/70 dark:bg-gray-900/70">
                   <CardContent className="p-12 text-center">
@@ -948,18 +948,18 @@ export default function AdminArtistsPage() {
                 </Card>
               )}
 
-      {/* Pagination */}
+              {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex justify-center items-center gap-4 mt-8">
-        <Button
-          variant="outline"
-          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-          disabled={currentPage === 1}
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
                     className="px-6"
-        >
+                  >
                     前のページ
-        </Button>
-                  
+                  </Button>
+
                   <div className="flex items-center gap-2">
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       const page = i + 1
@@ -994,17 +994,17 @@ export default function AdminArtistsPage() {
                         </Button>
                       </>
                     )}
-        </div>
-                  
-        <Button
-          variant="outline"
-          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage === totalPages}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
                     className="px-6"
-        >
+                  >
                     次のページ
-        </Button>
-      </div>
+                  </Button>
+                </div>
               )}
             </TabsContent>
 
@@ -1014,13 +1014,13 @@ export default function AdminArtistsPage() {
               <Card className="border-0 shadow-xl bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
                 <CardContent className="p-6">
                   <div className="flex flex-col sm:flex-row gap-4">
-            <div>
+                    <div>
                       <Label htmlFor="period" className="text-sm font-medium">期間</Label>
                       <Select value={rankingPeriod} onValueChange={setRankingPeriod}>
                         <SelectTrigger className="w-full sm:w-32 mt-1">
                           <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+                        </SelectTrigger>
+                        <SelectContent>
                           <SelectItem value="week">週間</SelectItem>
                           <SelectItem value="month">月間</SelectItem>
                           <SelectItem value="year">年間</SelectItem>
@@ -1028,7 +1028,7 @@ export default function AdminArtistsPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div>
                       <Label htmlFor="category" className="text-sm font-medium">カテゴリ</Label>
                       <Select value={rankingCategory} onValueChange={setRankingCategory}>
@@ -1044,11 +1044,11 @@ export default function AdminArtistsPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div className="flex-1" />
-                    
-                    <Button 
-                      onClick={fetchRankings} 
+
+                    <Button
+                      onClick={fetchRankings}
                       disabled={rankingsLoading}
                       className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
                     >
@@ -1056,12 +1056,12 @@ export default function AdminArtistsPage() {
                         <div className="flex items-center gap-2">
                           <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                           更新中...
-                    </div>
+                        </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <RefreshCw className="h-4 w-4" />
                           更新
-                    </div>
+                        </div>
                       )}
                     </Button>
                   </div>
@@ -1076,29 +1076,29 @@ export default function AdminArtistsPage() {
                       <div className="flex items-center gap-3">
                         <div className="p-3 bg-blue-500 rounded-xl">
                           <Users className="h-6 w-6 text-white" />
-            </div>
-            <div>
+                        </div>
+                        <div>
                           <div className="text-3xl font-bold text-blue-600">{rankings.stats.totalArtists}</div>
                           <div className="text-sm text-blue-600/80 font-medium">総アーティスト数</div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="border-0 shadow-xl bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/30 dark:to-yellow-900/30">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
                         <div className="p-3 bg-yellow-500 rounded-xl">
                           <Star className="h-6 w-6 text-white" />
-            </div>
-            <div>
+                        </div>
+                        <div>
                           <div className="text-3xl font-bold text-yellow-600">{rankings.stats.featuredArtists}</div>
                           <div className="text-sm text-yellow-600/80 font-medium">注目アーティスト</div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="border-0 shadow-xl bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
@@ -1112,7 +1112,7 @@ export default function AdminArtistsPage() {
                       </div>
                     </CardContent>
                   </Card>
-                  
+
                   <Card className="border-0 shadow-xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
@@ -1161,8 +1161,8 @@ export default function AdminArtistsPage() {
                         </TableHeader>
                         <TableBody>
                           {rankings.rankings.map((rankedArtist) => (
-                            <TableRow 
-                              key={rankedArtist.id} 
+                            <TableRow
+                              key={rankedArtist.id}
                               className="border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                             >
                               <TableCell>
@@ -1201,8 +1201,8 @@ export default function AdminArtistsPage() {
                               <TableCell>
                                 <div className="flex flex-wrap gap-1">
                                   {rankedArtist.isFeatured && (
-                                    <Badge 
-                                      variant="outline" 
+                                    <Badge
+                                      variant="outline"
                                       className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white border-0 shadow-sm"
                                     >
                                       <Star className="h-3 w-3 mr-1" />
@@ -1210,8 +1210,8 @@ export default function AdminArtistsPage() {
                                     </Badge>
                                   )}
                                   {rankedArtist.isVerified && (
-                                    <Badge 
-                                      variant="outline" 
+                                    <Badge
+                                      variant="outline"
                                       className="bg-gradient-to-r from-blue-400 to-blue-600 text-white border-0 shadow-sm"
                                     >
                                       <CheckCircle className="h-3 w-3 mr-1" />
@@ -1241,8 +1241,8 @@ export default function AdminArtistsPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <Badge 
-                                  variant="outline" 
+                                <Badge
+                                  variant="outline"
                                   className="font-bold bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-800 border-yellow-200"
                                 >
                                   {rankedArtist.stats.score}
@@ -1305,15 +1305,15 @@ export default function AdminArtistsPage() {
                         <Mail className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">{selectedArtist.email}</span>
                       </div>
-                      
+
                       {/* Badges */}
                       <div className="flex flex-wrap gap-2">
                         {getArtistBadges(selectedArtist).map((badge, index) => {
                           const Icon = badge.icon
                           return (
-                            <Badge 
-                              key={index} 
-                              variant="outline" 
+                            <Badge
+                              key={index}
+                              variant="outline"
                               className={cn(
                                 "font-semibold bg-gradient-to-r text-white border-0 shadow-md",
                                 badge.gradient
@@ -1511,13 +1511,13 @@ export default function AdminArtistsPage() {
                       onCheckedChange={(checked) => setStatusFormData({ ...statusFormData, isArtist: checked })}
                     />
                     <Label htmlFor="isArtist" className="font-medium">アーティスト指定</Label>
-            </div>
-                  
+                  </div>
+
                   {statusFormData.isArtist && (
-            <div>
+                    <div>
                       <Label htmlFor="artistRole" className="text-sm font-medium">アーティストレベル</Label>
-                      <Select 
-                        value={statusFormData.artistRole} 
+                      <Select
+                        value={statusFormData.artistRole}
                         onValueChange={(value) => setStatusFormData({ ...statusFormData, artistRole: value })}
                       >
                         <SelectTrigger className="mt-1">
@@ -1532,26 +1532,26 @@ export default function AdminArtistsPage() {
                       </Select>
                     </div>
                   )}
-                  
+
                   <div>
                     <Label htmlFor="reason" className="text-sm font-medium">理由</Label>
-              <Textarea
+                    <Textarea
                       id="reason"
                       value={statusFormData.reason}
                       onChange={(e) => setStatusFormData({ ...statusFormData, reason: e.target.value })}
                       placeholder="変更理由を入力..."
                       rows={3}
                       className="mt-1"
-              />
-            </div>
+                    />
+                  </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 pt-4 border-t">
                   <Button variant="outline" onClick={() => setShowStatusModal(false)}>
-                キャンセル
-              </Button>
-                  <Button 
-                    onClick={handleUpdateArtistStatus} 
+                    キャンセル
+                  </Button>
+                  <Button
+                    onClick={handleUpdateArtistStatus}
                     disabled={submitting}
                     className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                   >
@@ -1566,23 +1566,23 @@ export default function AdminArtistsPage() {
                         更新
                       </div>
                     )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Feature Modal */}
           <Dialog open={showFeatureModal} onOpenChange={setShowFeatureModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Star className="h-5 w-5" />
                   アーティスト注目設定
                 </DialogTitle>
-          </DialogHeader>
+              </DialogHeader>
               <div className="space-y-6">
-          <div className="space-y-4">
+                <div className="space-y-4">
                   <div className="flex items-center space-x-3">
                     <Switch
                       id="featured"
@@ -1590,8 +1590,8 @@ export default function AdminArtistsPage() {
                       onCheckedChange={(checked) => setFeatureFormData({ ...featureFormData, featured: checked })}
                     />
                     <Label htmlFor="featured" className="font-medium">注目アーティストに設定</Label>
-              </div>
-                  
+                  </div>
+
                   <div>
                     <Label htmlFor="featureReason" className="text-sm font-medium">理由</Label>
                     <Textarea
@@ -1602,15 +1602,15 @@ export default function AdminArtistsPage() {
                       rows={3}
                       className="mt-1"
                     />
-            </div>
+                  </div>
                 </div>
-                
+
                 <div className="flex justify-end space-x-3 pt-4 border-t">
                   <Button variant="outline" onClick={() => setShowFeatureModal(false)}>
                     キャンセル
-              </Button>
-                  <Button 
-                    onClick={handleFeatureArtist} 
+                  </Button>
+                  <Button
+                    onClick={handleFeatureArtist}
                     disabled={submitting}
                     className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
                   >
@@ -1626,10 +1626,10 @@ export default function AdminArtistsPage() {
                       </div>
                     )}
                   </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>
