@@ -13,6 +13,8 @@ import LoginModal from "@/components/login-modal"
 import api from "@/api/axios"
 import socketService from "@/lib/socket"
 import Link from "next/link"
+import { EmojiText } from "@/components/modern-icon"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface ChatRoom {
   id: string
@@ -28,6 +30,7 @@ interface ChatRoom {
   creator: {
     id: string
     nickname: string
+    avatar: string
   }
   createdAt: string
 }
@@ -48,7 +51,7 @@ export default function GroupChatPage() {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    
+
     if (diffInHours < 1) {
       return "1時間未満前"
     } else if (diffInHours < 24) {
@@ -143,9 +146,9 @@ export default function GroupChatPage() {
       setIsConnected(socketService.isConnectedToServer())
 
       const handleRoomUpdated = (room: ChatRoom) => {
-        setChatRooms(prevRooms => 
-          prevRooms.map(r => 
-            r.id === room.id 
+        setChatRooms(prevRooms =>
+          prevRooms.map(r =>
+            r.id === room.id
               ? { ...r, ...room, lastActivity: formatDate(room.lastActivity) }
               : r
           )
@@ -182,6 +185,7 @@ export default function GroupChatPage() {
         title: "ログインが必要です",
         description: "チャットルームに参加するには、ユーザー登録・ログインが必要です。",
         variant: "destructive",
+        duration: 3000,
       })
       setShowLoginModal(true)
       return
@@ -197,6 +201,8 @@ export default function GroupChatPage() {
     toast({
       title: "招待URLをコピーしました",
       description: `「${roomName}」の招待URLがクリップボードにコピーされました。`,
+      variant: "success",
+      duration: 3000,
     })
   }
 
@@ -216,13 +222,13 @@ export default function GroupChatPage() {
   const getAtmosphereLabel = (atmosphere: string) => {
     switch (atmosphere) {
       case "romantic":
-        return "💕 ロマンチック"
+        return <EmojiText text="💕 ロマンチック" iconSize={16} className="flex items-center" />
       case "intimate":
-        return "🌹 親密"
+        return <EmojiText text="🌹 親密" iconSize={16} className="flex items-center" />
       case "friendly":
-        return "😊 フレンドリー"
+        return <EmojiText text="😊 フレンドリー" iconSize={16} className="flex items-center" />
       default:
-        return "💬 一般"
+        return <EmojiText text="💬 一般" iconSize={16} className="flex items-center" />
     }
   }
 
@@ -306,7 +312,7 @@ export default function GroupChatPage() {
                 {isCreating ? "作成中..." : "ルーム作成"}
               </Button>
             </div>
-            <p className="text-sm text-pink-600">💡 作成後に招待URLが生成されます。URLを共有して友達を招待できます。</p>
+            <p className="text-sm text-pink-600">作成後に招待URLが生成されます。URLを共有して友達を招待できます。</p>
           </CardContent>
         </Card>
 
@@ -326,63 +332,73 @@ export default function GroupChatPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {chatRooms.map((room) => (
-              <Card
-                key={room.id}
-                className="hover:shadow-lg transition-all duration-300 border-2 hover:border-pink-200"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-2 text-gray-900">{room.name}</CardTitle>
-                      <Badge className={`text-xs ${getAtmosphereColor(room.atmosphere)}`}>
-                        {getAtmosphereLabel(room.atmosphere)}
-                      </Badge>
+              {chatRooms.map((room) => (
+                <Card
+                  key={room.id}
+                  className="hover:shadow-lg transition-all duration-300 border-2 hover:border-pink-200 flex flex-col justify-between"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between w-full">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg mb-2 text-gray-900">{room.name}</CardTitle>
+                        <div className="w-full flex justify-end items-center space-x-2">
+                          <Badge className={`text-xs ${getAtmosphereColor(room.atmosphere)}`}>
+                            {getAtmosphereLabel(room.atmosphere)}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
                     {room.isPrivate && (
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="w-full justify-center text-xs text-center">
                         🔒 プライベート
                       </Badge>
                     )}
-                  </div>
-                </CardHeader>
+                  </CardHeader>
 
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-gray-600 line-clamp-2">{room.description}</p>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-gray-600 line-clamp-2">{room.description}</p>
 
-                  <div className="flex items-center justify-between text-sm text-gray-500">
-                    <div className="flex items-center space-x-3">
-                      <span className="flex items-center">
-                        <Users className="w-4 h-4 mr-1" />
-                        {room.participantCount}人
-                      </span>
-                      <span className="flex items-center">
-                        <Clock className="w-4 h-4 mr-1" />
-                        {room.lastActivity}
-                      </span>
+                    <div className="flex items-center justify-between text-sm text-gray-500">
+                      <div className="flex items-center space-x-3">
+                        <span className="flex items-center">
+                          <Users className="w-4 h-4 mr-1" />
+                          {room.participantCount}人
+                        </span>
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          {room.lastActivity}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="text-xs text-gray-400">作成者: {room.creator.nickname}</div>
+                    <div className="text-xs text-gray-400 flex justify-between items-center">作成者:
+                      <div className="flex items-center space-x-2">
+                        <Avatar className="w-6 h-6 mr-2">
+                          <AvatarImage src={room.creator.avatar} />
+                          <AvatarFallback>{room.creator.nickname.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        {room.creator.nickname}
+                      </div>
+                    </div>
 
-                  <div className="flex space-x-2">
-                    <Button className="flex-1 bg-pink-600 hover:bg-pink-700" onClick={() => handleJoinRoom(room.id)}>
-                      <MessageCircle className="w-4 h-4 mr-2" />
-                      参加する
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyInviteUrl(room.id, room.name)}
-                      className="border-pink-200 text-pink-600 hover:bg-pink-50"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <div className="flex space-x-2">
+                      <Button className="flex-1 bg-pink-600 hover:bg-pink-700" onClick={() => handleJoinRoom(room.id)}>
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        参加する
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyInviteUrl(room.id, room.name)}
+                        className="border-pink-200 text-pink-600 hover:bg-pink-50"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </div>
 
@@ -391,7 +407,9 @@ export default function GroupChatPage() {
         {/* Instructions */}
         <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
           <CardHeader>
-            <CardTitle className="text-purple-800">💕 ロマンチックなチャット体験</CardTitle>
+            <CardTitle className="text-purple-800">
+              <EmojiText text="💕 ロマンチックなチャット体験" iconSize={20} />
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-purple-700">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

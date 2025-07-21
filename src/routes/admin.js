@@ -3483,4 +3483,807 @@ const calculateProfileCompleteness = (user) => {
   return Math.round((completeness / maxScore) * 100)
 }
 
+// =============================================================================
+// ADMIN SETTINGS MANAGEMENT
+// =============================================================================
+
+// Get all system settings
+router.get("/settings",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("system.settings"),
+  [
+    query("category").optional().trim(),
+    query("isPublic").optional().isBoolean()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { category, isPublic } = req.query
+
+      const where = {
+        ...(category && { category }),
+        ...(isPublic !== undefined && { isPublic: isPublic === 'true' })
+      }
+
+      const settings = await prisma.systemSetting.findMany({
+        where,
+        orderBy: [
+          { category: "asc" },
+          { key: "asc" }
+        ]
+      })
+
+      // Group settings by category
+      const groupedSettings = settings.reduce((acc, setting) => {
+        if (!acc[setting.category]) {
+          acc[setting.category] = []
+        }
+        acc[setting.category].push(setting)
+        return acc
+      }, {})
+
+      res.json({ 
+        settings: groupedSettings,
+        total: settings.length
+      })
+    } catch (error) {
+      console.error("Get settings error:", error)
+      res.status(500).json({ error: "Failed to fetch settings" })
+    }
+  }
+)
+
+// Get a specific setting by key
+router.get("/settings/:key",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("system.settings"),
+  async (req, res) => {
+    try {
+      const { key } = req.params
+
+      const setting = await prisma.systemSetting.findUnique({
+        where: { key }
+      })
+
+      if (!setting) {
+        return res.status(404).json({ error: "Setting not found" })
+      }
+
+      res.json({ setting })
+    } catch (error) {
+      console.error("Get setting error:", error)
+      res.status(500).json({ error: "Failed to fetch setting" })
+    }
+  }
+)
+
+// Create a new setting
+router.post("/settings",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("system.settings"),
+  logAdminAction("setting_created"),
+  [
+    body("key").trim().isLength({ min: 1, max: 100 }).matches(/^[a-z0-9_]+$/),
+    body("value").trim().isLength({ min: 0, max: 1000 }),
+    body("description").optional().trim().isLength({ max: 500 }),
+    body("category").trim().isLength({ min: 1, max: 50 }),
+    body("isPublic").optional().isBoolean()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { key, value, description, category, isPublic = false } = req.body
+
+      // Check if key already exists
+      const existingSetting = await prisma.systemSetting.findUnique({
+        where: { key }
+      })
+
+      if (existingSetting) {
+        return res.status(400).json({ error: "Setting with this key already exists" })
+      }
+
+      const setting = await prisma.systemSetting.create({
+        data: {
+          key,
+          value,
+          description,
+          category,
+          isPublic
+        }
+      })
+
+      // Add details for admin action logging
+      req.adminAction.details = {
+        settingKey: key,
+        category,
+        isPublic
+      }
+
+      res.status(201).json({
+        message: "Setting created successfully",
+        setting
+      })
+    } catch (error) {
+      console.error("Create setting error:", error)
+      res.status(500).json({ error: "Failed to create setting" })
+    }
+  }
+)
+
+// Update an existing setting
+router.put("/settings/:key",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("system.settings"),
+  logAdminAction("setting_updated"),
+  [
+    body("value").trim().isLength({ min: 0, max: 1000 }),
+    body("description").optional().trim().isLength({ max: 500 }),
+    body("category").optional().trim().isLength({ min: 1, max: 50 }),
+    body("isPublic").optional().isBoolean()
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { key } = req.params
+      const updateData = { ...req.body }
+
+      // Remove undefined values
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key]
+        }
+      })
+
+      const setting = await prisma.systemSetting.update({
+        where: { key },
+        data: updateData
+      })
+
+      // Add details for admin action logging
+      req.adminAction.details = {
+        settingKey: key,
+        updatedFields: updateData
+      }
+
+      res.json({
+        message: "Setting updated successfully",
+        setting
+      })
+    } catch (error) {
+      console.error("Update setting error:", error)
+      if (error.code === "P2025") {
+        return res.status(404).json({ error: "Setting not found" })
+      }
+      res.status(500).json({ error: "Failed to update setting" })
+    }
+  }
+)
+
+// Delete a setting
+router.delete("/settings/:key",
+  authenticateToken,
+  requireSuperAdmin,
+  logAdminAction("setting_deleted"),
+  async (req, res) => {
+    try {
+      const { key } = req.params
+
+      const setting = await prisma.systemSetting.delete({
+        where: { key }
+      })
+
+      // Add details for admin action logging
+      req.adminAction.details = {
+        settingKey: key,
+        deletedSetting: setting
+      }
+
+      res.json({
+        message: "Setting deleted successfully"
+      })
+    } catch (error) {
+      console.error("Delete setting error:", error)
+      if (error.code === "P2025") {
+        return res.status(404).json({ error: "Setting not found" })
+      }
+      res.status(500).json({ error: "Failed to delete setting" })
+    }
+  }
+)
+
+// Bulk update settings
+router.put("/settings",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("system.settings"),
+  logAdminAction("settings_bulk_updated"),
+  [
+    body("settings").isArray().custom((settings) => {
+      if (settings.length === 0) {
+        throw new Error("Settings array cannot be empty")
+      }
+      for (const setting of settings) {
+        if (!setting.key || !setting.value) {
+          throw new Error("Each setting must have key and value")
+        }
+      }
+      return true
+    })
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { settings } = req.body
+
+      // Use transaction for bulk update
+      const updatedSettings = await prisma.$transaction(
+        settings.map(setting => 
+          prisma.systemSetting.update({
+            where: { key: setting.key },
+            data: {
+              value: setting.value,
+              ...(setting.description && { description: setting.description }),
+              ...(setting.category && { category: setting.category }),
+              ...(setting.isPublic !== undefined && { isPublic: setting.isPublic })
+            }
+          })
+        )
+      )
+
+      // Add details for admin action logging
+      req.adminAction.details = {
+        updatedCount: settings.length,
+        settingKeys: settings.map(s => s.key)
+      }
+
+      res.json({
+        message: "Settings updated successfully",
+        settings: updatedSettings
+      })
+    } catch (error) {
+      console.error("Bulk update settings error:", error)
+      res.status(500).json({ error: "Failed to update settings" })
+    }
+  }
+)
+
+// =============================================================================
+// ADMIN ARTISTS MANAGEMENT
+// =============================================================================
+
+// Get all artists (users with artist role or special designation)
+router.get("/artists",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("user.view"),
+  [
+    query("page").optional().isInt({ min: 1 }),
+    query("limit").optional().isInt({ min: 1, max: 100 }),
+    query("search").optional().trim(),
+    query("isActive").optional().isBoolean(),
+    query("sortBy").optional().isIn(["createdAt", "nickname", "email", "lastLoginAt"]),
+    query("sortOrder").optional().isIn(["asc", "desc"])
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const page = parseInt(req.query.page) || 1
+      const limit = parseInt(req.query.limit) || 20
+      const offset = (page - 1) * limit
+      const { search, isActive, sortBy = "createdAt", sortOrder = "desc" } = req.query
+
+      // Define artist criteria - users with specific roles or interests
+      const where = {
+        OR: [
+          { role: { in: ["MODERATOR", "ADMIN"] } },
+          { interests: { has: "artist" } },
+          { interests: { has: "performer" } },
+          { interests: { has: "entertainer" } },
+          { bio: { contains: "artist", mode: "insensitive" } },
+          { bio: { contains: "performer", mode: "insensitive" } },
+          { occupation: { contains: "artist", mode: "insensitive" } }
+        ],
+        ...(search && {
+          AND: [
+            {
+              OR: [
+                { nickname: { contains: search, mode: "insensitive" } },
+                { email: { contains: search, mode: "insensitive" } },
+                { fullName: { contains: search, mode: "insensitive" } },
+                { bio: { contains: search, mode: "insensitive" } }
+              ]
+            }
+          ]
+        }),
+        ...(isActive !== undefined && { isActive: isActive === 'true' })
+      }
+
+      const orderBy = { [sortBy]: sortOrder }
+
+      const [artists, total] = await Promise.all([
+        prisma.user.findMany({
+          where,
+          select: {
+            id: true,
+            nickname: true,
+            email: true,
+            fullName: true,
+            bio: true,
+            avatar: true,
+            age: true,
+            location: true,
+            gender: true,
+            occupation: true,
+            interests: true,
+            role: true,
+            isActive: true,
+            isBlocked: true,
+            isSuspended: true,
+            createdAt: true,
+            updatedAt: true,
+            lastLoginAt: true,
+            lastActiveAt: true,
+            _count: {
+              select: {
+                posts: true,
+                comments: true,
+                likes: true,
+                chatMessages: true
+              }
+            }
+          },
+          orderBy,
+          skip: offset,
+          take: limit
+        }),
+        prisma.user.count({ where })
+      ])
+
+      // Calculate artist metrics and rankings
+      const artistsWithMetrics = artists.map((artist, index) => ({
+        ...artist,
+        ranking: offset + index + 1,
+        stats: {
+          postsCount: artist._count.posts,
+          commentsCount: artist._count.comments,
+          likesCount: artist._count.likes,
+          messagesCount: artist._count.chatMessages,
+          totalActivity: artist._count.posts + artist._count.comments + artist._count.likes
+        },
+        isArtist: true,
+        _count: undefined
+      }))
+
+      res.json({
+        artists: artistsWithMetrics,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      })
+    } catch (error) {
+      console.error("Get artists error:", error)
+      res.status(500).json({ error: "Failed to fetch artists" })
+    }
+  }
+)
+
+// Get specific artist details
+router.get("/artists/:id",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("user.view"),
+  async (req, res) => {
+    try {
+      const { id } = req.params
+
+      const artist = await prisma.user.findUnique({
+        where: { id },
+        include: {
+          posts: {
+            select: {
+              id: true,
+              title: true,
+              category: true,
+              viewCount: true,
+              createdAt: true,
+              _count: {
+                select: {
+                  comments: true,
+                  likes: true
+                }
+              }
+            },
+            orderBy: { createdAt: "desc" },
+            take: 10
+          },
+          _count: {
+            select: {
+              posts: true,
+              comments: true,
+              likes: true,
+              chatMessages: true,
+              reports: true
+            }
+          }
+        }
+      })
+
+      if (!artist) {
+        return res.status(404).json({ error: "Artist not found" })
+      }
+
+      // Remove password from response
+      const { password, ...artistWithoutPassword } = artist
+
+      // Calculate additional metrics
+      const totalViews = artist.posts.reduce((sum, post) => sum + post.viewCount, 0)
+      const totalInteractions = artist.posts.reduce((sum, post) => 
+        sum + post._count.comments + post._count.likes, 0)
+
+      res.json({
+        artist: {
+          ...artistWithoutPassword,
+          stats: {
+            postsCount: artist._count.posts,
+            commentsCount: artist._count.comments,
+            likesCount: artist._count.likes,
+            messagesCount: artist._count.chatMessages,
+            reportsCount: artist._count.reports,
+            totalViews,
+            totalInteractions,
+            avgViewsPerPost: artist._count.posts > 0 ? Math.round(totalViews / artist._count.posts) : 0
+          },
+          recentPosts: artist.posts.map(post => ({
+            ...post,
+            stats: {
+              comments: post._count.comments,
+              likes: post._count.likes
+            },
+            _count: undefined
+          })),
+          _count: undefined
+        }
+      })
+    } catch (error) {
+      console.error("Get artist error:", error)
+      res.status(500).json({ error: "Failed to fetch artist" })
+    }
+  }
+)
+
+// Update artist status (promote/demote artist designation)
+router.patch("/artists/:id/status",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("user.edit"),
+  logAdminAction("artist_status_updated"),
+  [
+    body("isArtist").isBoolean(),
+    body("artistRole").optional().isIn(["featured", "verified", "premium", "standard"]),
+    body("reason").optional().trim().isLength({ max: 500 })
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { id } = req.params
+      const { isArtist, artistRole, reason } = req.body
+
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, nickname: true, interests: true }
+      })
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" })
+      }
+
+      // Update user interests to include/remove artist designation
+      let updatedInterests = user.interests || []
+      
+      if (isArtist) {
+        // Add artist-related interests if not present
+        const artistInterests = ["artist", "performer"]
+        artistInterests.forEach(interest => {
+          if (!updatedInterests.includes(interest)) {
+            updatedInterests.push(interest)
+          }
+        })
+        
+        // Add artist role if specified
+        if (artistRole) {
+          updatedInterests = updatedInterests.filter(i => !i.startsWith("artist_"))
+          updatedInterests.push(`artist_${artistRole}`)
+        }
+      } else {
+        // Remove artist-related interests
+        updatedInterests = updatedInterests.filter(interest => 
+          !["artist", "performer", "entertainer"].includes(interest) &&
+          !interest.startsWith("artist_")
+        )
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          interests: updatedInterests
+        },
+        select: {
+          id: true,
+          nickname: true,
+          interests: true,
+          bio: true,
+          occupation: true
+        }
+      })
+
+      // Add details for admin action logging
+      req.adminAction.details = {
+        targetUser: user.nickname,
+        isArtist,
+        artistRole,
+        reason,
+        previousInterests: user.interests,
+        newInterests: updatedInterests
+      }
+
+      res.json({
+        message: `Artist status ${isArtist ? 'granted' : 'removed'} successfully`,
+        user: updatedUser
+      })
+    } catch (error) {
+      console.error("Update artist status error:", error)
+      res.status(500).json({ error: "Failed to update artist status" })
+    }
+  }
+)
+
+// Feature/unfeature an artist
+router.patch("/artists/:id/feature",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("content.feature"),
+  logAdminAction("artist_featured"),
+  [
+    body("featured").isBoolean(),
+    body("reason").optional().trim().isLength({ max: 500 })
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { id } = req.params
+      const { featured, reason } = req.body
+
+      const user = await prisma.user.findUnique({
+        where: { id },
+        select: { id: true, nickname: true, interests: true }
+      })
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" })
+      }
+
+      // Update user interests to add/remove featured status
+      let updatedInterests = user.interests || []
+      
+      if (featured) {
+        if (!updatedInterests.includes("featured_artist")) {
+          updatedInterests.push("featured_artist")
+        }
+      } else {
+        updatedInterests = updatedInterests.filter(interest => interest !== "featured_artist")
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          interests: updatedInterests
+        },
+        select: {
+          id: true,
+          nickname: true,
+          interests: true
+        }
+      })
+
+      // Add details for admin action logging
+      req.adminAction.details = {
+        targetUser: user.nickname,
+        featured,
+        reason,
+        previousInterests: user.interests,
+        newInterests: updatedInterests
+      }
+
+      res.json({
+        message: `Artist ${featured ? 'featured' : 'unfeatured'} successfully`,
+        user: updatedUser
+      })
+    } catch (error) {
+      console.error("Feature artist error:", error)
+      res.status(500).json({ error: "Failed to update artist feature status" })
+    }
+  }
+)
+
+// Get artist rankings and statistics
+router.get("/artists/rankings/stats",
+  authenticateToken,
+  requireAdmin,
+  requirePermission("user.view"),
+  [
+    query("period").optional().isIn(["week", "month", "year", "all"]),
+    query("category").optional().isIn(["posts", "likes", "comments", "activity", "views"])
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req)
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: "Validation failed", details: errors.array() })
+      }
+
+      const { period = "month", category = "activity" } = req.query
+
+      // Calculate date range
+      const now = new Date()
+      let startDate = new Date()
+      switch (period) {
+        case "week":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          break
+        case "month":
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          break
+        case "year":
+          startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+          break
+        case "all":
+          startDate = new Date("1970-01-01")
+          break
+      }
+
+      // Get artists with activity in the specified period
+      const artists = await prisma.user.findMany({
+        where: {
+          OR: [
+            { interests: { has: "artist" } },
+            { interests: { has: "performer" } },
+            { interests: { hasSome: ["featured_artist", "artist_verified", "artist_premium"] } }
+          ],
+          isActive: true,
+          ...(period !== "all" && {
+            OR: [
+              { posts: { some: { createdAt: { gte: startDate } } } },
+              { comments: { some: { createdAt: { gte: startDate } } } },
+              { likes: { some: { createdAt: { gte: startDate } } } }
+            ]
+          })
+        },
+        include: {
+          _count: {
+            select: {
+              posts: period !== "all" ? { where: { createdAt: { gte: startDate } } } : true,
+              comments: period !== "all" ? { where: { createdAt: { gte: startDate } } } : true,
+              likes: period !== "all" ? { where: { createdAt: { gte: startDate } } } : true
+            }
+          },
+          posts: {
+            select: {
+              viewCount: true,
+              createdAt: true
+            },
+            ...(period !== "all" && { where: { createdAt: { gte: startDate } } })
+          }
+        }
+      })
+
+      // Calculate rankings based on category
+      const artistsWithScores = artists.map(artist => {
+        const totalViews = artist.posts.reduce((sum, post) => sum + post.viewCount, 0)
+        let score = 0
+
+        switch (category) {
+          case "posts":
+            score = artist._count.posts
+            break
+          case "likes":
+            score = artist._count.likes
+            break
+          case "comments":
+            score = artist._count.comments
+            break
+          case "views":
+            score = totalViews
+            break
+          case "activity":
+          default:
+            score = artist._count.posts * 3 + artist._count.comments * 2 + artist._count.likes + (totalViews * 0.1)
+            break
+        }
+
+        return {
+          id: artist.id,
+          nickname: artist.nickname,
+          avatar: artist.avatar,
+          bio: artist.bio,
+          interests: artist.interests,
+          stats: {
+            posts: artist._count.posts,
+            comments: artist._count.comments,
+            likes: artist._count.likes,
+            views: totalViews,
+            score: Math.round(score)
+          },
+          isFeatured: artist.interests?.includes("featured_artist") || false,
+          isVerified: artist.interests?.includes("artist_verified") || false
+        }
+      })
+
+      // Sort by score and add rankings
+      artistsWithScores.sort((a, b) => b.stats.score - a.stats.score)
+      const rankedArtists = artistsWithScores.map((artist, index) => ({
+        ...artist,
+        rank: index + 1
+      }))
+
+      // Calculate category statistics
+      const stats = {
+        totalArtists: rankedArtists.length,
+        featuredArtists: rankedArtists.filter(a => a.isFeatured).length,
+        verifiedArtists: rankedArtists.filter(a => a.isVerified).length,
+        period,
+        category,
+        topScore: rankedArtists[0]?.stats.score || 0,
+        avgScore: rankedArtists.length > 0 
+          ? Math.round(rankedArtists.reduce((sum, a) => sum + a.stats.score, 0) / rankedArtists.length)
+          : 0
+      }
+
+      res.json({
+        rankings: rankedArtists.slice(0, 50), // Top 50
+        stats,
+        generatedAt: now.toISOString()
+      })
+    } catch (error) {
+      console.error("Get artist rankings error:", error)
+      res.status(500).json({ error: "Failed to fetch artist rankings" })
+    }
+  }
+)
+
 module.exports = router 

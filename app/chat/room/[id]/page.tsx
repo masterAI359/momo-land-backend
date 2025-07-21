@@ -6,13 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ArrowLeft, Users, Send, Wifi, WifiOff, Heart, Copy, UserPlus, Sparkles } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth"
 import api from "@/api/axios"
 import socketService from "@/lib/socket"
+import { EmojiText } from "@/components/modern-icon"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Message {
   id: string
@@ -40,6 +42,7 @@ interface ChatRoom {
     user: {
       id: string
       nickname: string
+      avatar: string
     }
   }>
   messages: Message[]
@@ -51,7 +54,7 @@ export default function ChatRoomPage() {
   const { toast } = useToast()
   const [room, setRoom] = useState<ChatRoom | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
-  const [onlineUsers, setOnlineUsers] = useState<Array<{ id: string; nickname: string }>>([])
+  const [onlineUsers, setOnlineUsers] = useState<Array<{ id: string; nickname: string; avatar: string }>>([])
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -100,11 +103,29 @@ export default function ChatRoomPage() {
   }
 
   const leaveRoom = async () => {
+    if (!user || !room) {
+      toast({
+        title: "エラー",
+        description: "ルーム情報が取得できません",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       await api.post(`/chat/rooms/${params.id}/leave`)
       socketService.leaveChatRoom(params.id as string)
+      toast({
+        title: "退出完了",
+        description: "ルームから退出しました",
+      })
     } catch (error: any) {
       console.error("Failed to leave room:", error)
+      toast({
+        title: "エラー",
+        description: error.response?.data?.error || "ルームからの退出に失敗しました",
+        variant: "destructive",
+      })
     }
   }
 
@@ -198,22 +219,117 @@ export default function ChatRoomPage() {
   const getAtmosphereLabel = (atmosphere: string) => {
     switch (atmosphere) {
       case "romantic":
-        return "💕 ロマンチック"
+        return (
+          <EmojiText 
+            text="💕 ロマンチック" 
+            iconSize={16} 
+            className="flex items-center" 
+          />
+        )
       case "intimate":
-        return "🌹 親密"
+        return (
+          <EmojiText 
+            text="🌹 親密" 
+            iconSize={16} 
+            className="flex items-center" 
+          />
+        )
       case "friendly":
-        return "😊 フレンドリー"
+        return (
+          <EmojiText 
+            text="😊 フレンドリー" 
+            iconSize={16} 
+            className="flex items-center" 
+          />
+        )
       default:
-        return "💬 一般"
+        return (
+          <EmojiText 
+            text="💬 一般" 
+            iconSize={16} 
+            className="flex items-center" 
+          />
+        )
     }
   }
 
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">チャットルームを読み込み中...</p>
+        <div className="space-y-6">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-10 w-10" />
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+            </div>
+            <Skeleton className="h-10 w-24" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Chat Area Skeleton */}
+            <div className="lg:col-span-3">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <Skeleton className="h-6 w-32" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4 mb-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="flex space-x-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-6 w-full max-w-xs" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex space-x-2">
+                    <Skeleton className="h-10 flex-1" />
+                    <Skeleton className="h-10 w-20" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Sidebar Skeleton */}
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center space-x-2">
+                        <Skeleton className="h-2 w-2 rounded-full" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -235,8 +351,8 @@ export default function ChatRoomPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col lg:flex-row gap-8 h-[80vh]">
+    <div className="max-w-full w-1/2 mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
+      <div className="flex flex-col lg:flex-row gap-8 h-full">
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
@@ -271,7 +387,7 @@ export default function ChatRoomPage() {
           </div>
 
           {/* Messages */}
-          <Card className="flex-1 flex flex-col">
+          <Card className="flex-1 flex flex-col border-none">
             <CardContent className="flex-1 overflow-hidden p-4">
               <div className="h-full overflow-y-auto space-y-4">
                 {messages.map((message) => (
@@ -327,32 +443,38 @@ export default function ChatRoomPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="lg:w-80 space-y-4">
+        <div className="lg:w-80 flex flex-col space-y-4 h-[calc(100vh-200px)]">
           {/* Room Info */}
-          <Card>
+          <Card className="flex-shrink-0">
             <CardHeader>
-              <CardTitle className="text-lg">ルーム情報</CardTitle>
+              <CardTitle className="text-lg font-bold text-gray-900">ルーム情報</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-2">{room.description}</p>
+              <p className="text-sm text-pink-600 mb-2 line-clamp-3 overflow-hidden text-ellipsis">{room.description}</p>
               <p className="text-xs text-gray-500">作成者: {room.creator.nickname}</p>
             </CardContent>
           </Card>
 
           {/* Online Users */}
-          <Card>
-            <CardHeader>
+          <Card className="flex-1 flex flex-col min-h-0">
+            <CardHeader className="flex-shrink-0">
               <CardTitle className="text-lg flex items-center">
                 <Users className="w-5 h-5 mr-2" />
                 オンライン ({onlineUsers.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 overflow-y-auto">
               <div className="space-y-2">
                 {onlineUsers.map((user) => (
                   <div key={user.id} className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm">{user.nickname}</span>
+                    <div className="flex items-center space-x-2">
+                      <Avatar>
+                        <AvatarImage src={user.avatar ? user.avatar : "/images/avatar/default.png"} />
+                        <AvatarFallback>{user.nickname.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium text-gray-900">{user.nickname}</span>
+                    </div>
                   </div>
                 ))}
               </div>

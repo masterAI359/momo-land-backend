@@ -38,12 +38,12 @@ export default function Footer() {
   ]
 
   return (
-    <footer className="bg-gradient-to-r from-gray-900 to-gray-800 text-white">
+    <footer className="mt-4 bg-gradient-to-r from-gray-900 to-gray-800 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand Section */}
           <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center space-x-3">
+            {/* <div className="flex items-center space-x-3">
               <div className="relative w-10 h-10">
                 <Image
                   src="/images/logos/logo.png"
@@ -52,13 +52,7 @@ export default function Footer() {
                   className="object-contain"
                 />
               </div>
-              <div>
-                <h2 className="text-2xl font-bold">momoLand</h2>
-                <Badge variant="secondary" className="text-xs">
-                  コミュニティサイト
-                </Badge>
-              </div>
-            </div>
+            </div> */}
             
             <p className="text-gray-300 text-sm leading-relaxed max-w-md">
               ライブチャット体験記を共有し、ユーザー同士の交流を促進するコミュニティサイトです。

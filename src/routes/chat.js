@@ -37,6 +37,7 @@ router.get("/rooms", authenticateToken, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
               },
             },
           },
@@ -157,6 +158,7 @@ router.get("/rooms/:id", authenticateToken, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
               },
             },
           },
@@ -170,6 +172,7 @@ router.get("/rooms/:id", authenticateToken, async (req, res) => {
               select: {
                 id: true,
                 nickname: true,
+                avatar: true,
               },
             },
           },
@@ -273,6 +276,21 @@ router.post("/rooms/:id/leave", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
 
+    // Check if the user is a member of the room
+    const existingMember = await prisma.roomMember.findUnique({
+      where: {
+        roomId_userId: {
+          roomId: id,
+          userId: req.user.id,
+        },
+      },
+    })
+
+    if (!existingMember) {
+      return res.status(400).json({ error: "You are not a member of this room" })
+    }
+
+    // Update member status to offline
     await prisma.roomMember.update({
       where: {
         roomId_userId: {
@@ -286,15 +304,17 @@ router.post("/rooms/:id/leave", authenticateToken, async (req, res) => {
       },
     })
 
-    // Create leave message
-    await prisma.chatMessage.create({
-      data: {
-        content: `${req.user.nickname}さんがルームを退出しました`,
-        type: "leave",
-        roomId: id,
-        userId: req.user.id,
-      },
-    })
+    // Create leave message only if the user was online
+    if (existingMember.isOnline) {
+      await prisma.chatMessage.create({
+        data: {
+          content: `${req.user.nickname}さんがルームを退出しました`,
+          type: "leave",
+          roomId: id,
+          userId: req.user.id,
+        },
+      })
+    }
 
     res.json({ message: "Left room successfully" })
   } catch (error) {

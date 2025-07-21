@@ -112,6 +112,28 @@ export default function AdminPostsPage() {
   const [editForm, setEditForm] = useState<Partial<Post>>({})
   const [moderationStatus, setModerationStatus] = useState("")
   const [moderationReason, setModerationReason] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Reset states when component unmounts
+  useEffect(() => {
+    return () => {
+      setIsSubmitting(false)
+      setLoading(false)
+    }
+  }, [])
+
+  // Function to reset all form states
+  const resetAllStates = () => {
+    setIsSubmitting(false)
+    setError(null)
+    setShowEditPost(false)
+    setShowDeletePost(false)
+    setShowModerationDialog(false)
+    setSelectedPost(null)
+    setEditForm({})
+    setModerationStatus("")
+    setModerationReason("")
+  }
 
   useEffect(() => {
     if (!user) {
@@ -141,14 +163,27 @@ export default function AdminPostsPage() {
         sortOrder: filters.sortOrder
       })
 
-      const response = await api.get(`/admin/posts?${params}`)
-      setPosts(response.data.posts)
-      setTotalPages(response.data.pagination.pages)
+      const response = await api.get(`/admin/posts?${params}`, {
+        timeout: 10000
+      })
+      setPosts(response.data.posts || [])
+      setTotalPages(response.data.pagination?.pages || 1)
     } catch (error: any) {
       console.error("Failed to fetch posts:", error)
-      setError(error.response?.data?.error || "Failed to load posts")
+      
+      let errorMessage = "投稿一覧の読み込みに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
     } finally {
-      setLoading(false)
+      setTimeout(() => setLoading(false), 100)
     }
   }
 
@@ -172,50 +207,105 @@ export default function AdminPostsPage() {
   }
 
   const handleSaveEdit = async () => {
-    if (!selectedPost) return
+    if (!selectedPost || isSubmitting) return
 
     try {
-      await api.put(`/admin/posts/${selectedPost.id}`, editForm)
-      setShowEditPost(false)
-      setSelectedPost(null)
-      setEditForm({})
+      setIsSubmitting(true)
+      setError(null)
+      
+      await api.put(`/admin/posts/${selectedPost.id}`, editForm, {
+        timeout: 8000
+      })
+      
       await fetchPosts()
+      resetAllStates()
     } catch (error: any) {
       console.error("Failed to update post:", error)
-      setError(error.response?.data?.error || "Failed to update post")
+      
+      let errorMessage = "投稿の更新に失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "投稿が見つかりません"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 100)
     }
   }
 
   const handleDeletePost = async () => {
-    if (!selectedPost) return
+    if (!selectedPost || isSubmitting) return
 
     try {
-      await api.delete(`/admin/posts/${selectedPost.id}`)
-      setShowDeletePost(false)
-      setSelectedPost(null)
+      setIsSubmitting(true)
+      setError(null)
+      
+      await api.delete(`/admin/posts/${selectedPost.id}`, {
+        timeout: 8000
+      })
+      
       await fetchPosts()
+      resetAllStates()
     } catch (error: any) {
       console.error("Failed to delete post:", error)
-      setError(error.response?.data?.error || "Failed to delete post")
+      
+      let errorMessage = "投稿の削除に失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "投稿が見つかりません"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 100)
     }
   }
 
   const handleModerationAction = async () => {
-    if (!selectedPost || !moderationStatus) return
+    if (!selectedPost || !moderationStatus || isSubmitting) return
 
     try {
+      setIsSubmitting(true)
+      setError(null)
+      
       await api.put(`/admin/posts/${selectedPost.id}/status`, {
         status: moderationStatus,
         reason: moderationReason
-      })
-      setShowModerationDialog(false)
-      setSelectedPost(null)
-      setModerationStatus("")
-      setModerationReason("")
+      }, { timeout: 8000 })
+      
       await fetchPosts()
+      resetAllStates()
     } catch (error: any) {
       console.error("Failed to moderate post:", error)
-      setError(error.response?.data?.error || "Failed to moderate post")
+      
+      let errorMessage = "投稿のモデレーションに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "投稿が見つかりません"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 100)
     }
   }
 
@@ -279,8 +369,17 @@ export default function AdminPostsPage() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button onClick={fetchPosts} className="mt-4">
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button 
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setError(null)
+            fetchPosts()
+          }} 
+          className="mt-4"
+          disabled={loading || isSubmitting}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
           再試行
         </Button>
       </div>
@@ -301,8 +400,17 @@ export default function AdminPostsPage() {
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <Button onClick={fetchPosts} variant="outline" size="sm">
-              <RefreshCw className="h-4 w-4 mr-2" />
+            <Button 
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                fetchPosts()
+              }} 
+              variant="outline" 
+              size="sm"
+              disabled={loading || isSubmitting}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               更新
             </Button>
           </div>
@@ -531,21 +639,39 @@ export default function AdminPostsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditPost(post)}>
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleEditPost(post)
+                            }}
+                            disabled={isSubmitting}
+                          >
                             <Edit className="h-4 w-4 mr-2" />
                             編集
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedPost(post)
-                            setShowModerationDialog(true)
-                          }}>
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedPost(post)
+                              setShowModerationDialog(true)
+                            }}
+                            disabled={isSubmitting}
+                          >
                             <Flag className="h-4 w-4 mr-2" />
                             モデレーション
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedPost(post)
-                            setShowDeletePost(true)
-                          }} className="text-red-600">
+                          <DropdownMenuItem 
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedPost(post)
+                              setShowDeletePost(true)
+                            }} 
+                            disabled={isSubmitting}
+                            className="text-red-600"
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             削除
                           </DropdownMenuItem>
@@ -567,16 +693,24 @@ export default function AdminPostsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCurrentPage(Math.max(1, currentPage - 1))
+                }}
+                disabled={currentPage === 1 || loading || isSubmitting}
               >
                 前へ
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCurrentPage(Math.min(totalPages, currentPage + 1))
+                }}
+                disabled={currentPage === totalPages || loading || isSubmitting}
               >
                 次へ
               </Button>
@@ -586,7 +720,14 @@ export default function AdminPostsPage() {
       </Card>
 
       {/* Edit Post Dialog */}
-      <Dialog open={showEditPost} onOpenChange={setShowEditPost}>
+      <Dialog open={showEditPost} onOpenChange={(open) => {
+        setShowEditPost(open)
+        if (!open) {
+          setError(null)
+          setIsSubmitting(false)
+          setEditForm({})
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>投稿を編集</DialogTitle>
@@ -661,12 +802,42 @@ export default function AdminPostsPage() {
                 onChange={(e) => setEditForm(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
               />
             </div>
+            
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowEditPost(false)}>
+              <Button 
+                variant="outline" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowEditPost(false)
+                }}
+                disabled={isSubmitting}
+              >
                 キャンセル
               </Button>
-              <Button onClick={handleSaveEdit}>
-                保存
+              <Button 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleSaveEdit()
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    保存中...
+                  </>
+                ) : (
+                  '保存'
+                )}
               </Button>
             </div>
           </div>
@@ -674,7 +845,15 @@ export default function AdminPostsPage() {
       </Dialog>
 
       {/* Moderation Dialog */}
-      <Dialog open={showModerationDialog} onOpenChange={setShowModerationDialog}>
+      <Dialog open={showModerationDialog} onOpenChange={(open) => {
+        setShowModerationDialog(open)
+        if (!open) {
+          setError(null)
+          setIsSubmitting(false)
+          setModerationStatus("")
+          setModerationReason("")
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>投稿をモデレーション</DialogTitle>
@@ -703,12 +882,42 @@ export default function AdminPostsPage() {
                 onChange={(e) => setModerationReason(e.target.value)}
               />
             </div>
+            
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowModerationDialog(false)}>
+              <Button 
+                variant="outline" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowModerationDialog(false)
+                }}
+                disabled={isSubmitting}
+              >
                 キャンセル
               </Button>
-              <Button onClick={handleModerationAction}>
-                適用
+              <Button 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleModerationAction()
+                }}
+                disabled={!moderationStatus || isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    適用中...
+                  </>
+                ) : (
+                  '適用'
+                )}
               </Button>
             </div>
           </div>
@@ -716,19 +925,56 @@ export default function AdminPostsPage() {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeletePost} onOpenChange={setShowDeletePost}>
+      <Dialog open={showDeletePost} onOpenChange={(open) => {
+        setShowDeletePost(open)
+        if (!open) {
+          setError(null)
+          setIsSubmitting(false)
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>投稿を削除</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p>この投稿を削除してもよろしいですか？この操作は取り消せません。</p>
+            
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowDeletePost(false)}>
+              <Button 
+                variant="outline" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setShowDeletePost(false)
+                }}
+                disabled={isSubmitting}
+              >
                 キャンセル
               </Button>
-              <Button variant="destructive" onClick={handleDeletePost}>
-                削除
+              <Button 
+                variant="destructive" 
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleDeletePost()
+                }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    削除中...
+                  </>
+                ) : (
+                  '削除'
+                )}
               </Button>
             </div>
           </div>

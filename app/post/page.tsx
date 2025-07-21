@@ -63,6 +63,7 @@ export default function PostPage() {
         title: "入力エラー",
         description: "タイトルと内容を入力してください。",
         variant: "destructive",
+        duration: 3000,
       })
       return
     }
@@ -72,6 +73,7 @@ export default function PostPage() {
         title: "入力エラー",
         description: "内容は10文字以上で入力してください。",
         variant: "destructive",
+        duration: 3000,
       })
       return
     }
@@ -81,6 +83,7 @@ export default function PostPage() {
         title: "入力エラー",
         description: "タイトルは200文字以内で入力してください。",
         variant: "destructive",
+        duration: 3000,
       })
       return
     }
@@ -95,6 +98,7 @@ export default function PostPage() {
           title: "認証エラー",
           description: "ログイン情報が見つかりません。再度ログインしてください。",
           variant: "destructive",
+          duration: 3000,
         })
         setShowLoginModal(true)
         return
@@ -117,6 +121,7 @@ export default function PostPage() {
       toast({
         title: "投稿完了",
         description: "体験記が正常に投稿されました！リアルタイムで他のユーザーに表示されます。",
+        variant: "success",
       })
 
       // Clear form after successful submission
@@ -129,6 +134,7 @@ export default function PostPage() {
         toast({
           title: "🚀 リアルタイム配信中",
           description: "あなたの投稿が他のユーザーにリアルタイムで表示されました！",
+          variant: "success",
         })
       }
       
@@ -160,6 +166,7 @@ export default function PostPage() {
         title: "投稿エラー",
         description: errorMessage,
         variant: "destructive",
+        duration: 3000,
       })
     } finally {
       setIsSubmitting(false)
@@ -189,7 +196,7 @@ export default function PostPage() {
       <div className="space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">✍️ 体験記投稿</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">体験記投稿</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
             あなたのライブチャット体験を詳しく投稿して、他のユーザーと共有しましょう。
             リアルな体験談は多くの人の参考になります。
@@ -315,6 +322,8 @@ export default function PostPage() {
                     toast({
                       title: "プレビュー機能",
                       description: "プレビュー機能は今後実装予定です。",
+                      variant: "info",
+                      duration: 3000,
                     })
                   }}
                 >
@@ -323,7 +332,7 @@ export default function PostPage() {
                 </Button>
               </div>
               
-              {/* Debug Info */}
+              {/* Debug Info
               {process.env.NODE_ENV === 'development' && (
                 <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
                   <p><strong>Debug Info:</strong></p>
@@ -334,7 +343,7 @@ export default function PostPage() {
                   <p>Category: {category}</p>
                   <p>User: {user?.nickname || "Not logged in"}</p>
                 </div>
-              )}
+              )} */}
             </form>
           </CardContent>
         </Card>

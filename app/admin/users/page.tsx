@@ -56,6 +56,7 @@ interface User {
   id: string
   nickname: string
   email: string
+  avatar?: string
   fullName?: string
   bio?: string
   age?: number
@@ -126,6 +127,31 @@ export default function UserManagement() {
   const [isPermanent, setIsPermanent] = useState(false)
   const [blockReason, setBlockReason] = useState("")
   const [editForm, setEditForm] = useState<Partial<User>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Reset states when component unmounts
+  useEffect(() => {
+    return () => {
+      setIsSubmitting(false)
+      setLoading(false)
+    }
+  }, [])
+
+  // Function to reset all form states
+  const resetAllStates = () => {
+    setIsSubmitting(false)
+    setError(null)
+    setShowUserDetails(false)
+    setShowEditUser(false)
+    setShowSuspendUser(false)
+    setShowBlockUser(false)
+    setSelectedUser(null)
+    setSuspendReason("")
+    setSuspendDuration("7")
+    setIsPermanent(false)
+    setBlockReason("")
+    setEditForm({})
+  }
 
   useEffect(() => {
     if (!user) {
@@ -159,19 +185,37 @@ export default function UserManagement() {
       if (filters.sortBy) params.append("sortBy", filters.sortBy)
       if (filters.sortOrder) params.append("sortOrder", filters.sortOrder)
 
-      const response = await api.get(`/admin/users?${params}`)
-      setUsers(response.data.users)
-      setTotalPages(response.data.pagination.pages)
+      const response = await api.get(`/admin/users?${params}`, {
+        timeout: 10000
+      })
+      setUsers(response.data.users || [])
+      setTotalPages(response.data.pagination?.pages || 1)
     } catch (error: any) {
       console.error("Failed to fetch users:", error)
-      setError(error.response?.data?.error || "Failed to load users")
+      
+      let errorMessage = "ユーザー一覧の読み込みに失敗しました"
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
     } finally {
-      setLoading(false)
+      setTimeout(() => setLoading(false), 100)
     }
   }
 
   const handleUserAction = async (action: string, userId: string, data?: any) => {
+    if (isSubmitting) return
+    
     try {
+      setIsSubmitting(true)
+      setError(null)
+      
       let response
       switch (action) {
         case "suspend":
@@ -179,42 +223,52 @@ export default function UserManagement() {
             reason: suspendReason,
             duration: isPermanent ? undefined : parseInt(suspendDuration),
             permanent: isPermanent
-          })
+          }, { timeout: 8000 })
           break
         case "unsuspend":
-          response = await api.post(`/admin/users/${userId}/unsuspend`)
+          response = await api.post(`/admin/users/${userId}/unsuspend`, {}, { timeout: 8000 })
           break
         case "block":
           response = await api.post(`/admin/users/${userId}/block`, {
             reason: blockReason
-          })
+          }, { timeout: 8000 })
           break
         case "unblock":
-          response = await api.post(`/admin/users/${userId}/unblock`)
+          response = await api.post(`/admin/users/${userId}/unblock`, {}, { timeout: 8000 })
           break
         case "update":
-          response = await api.put(`/admin/users/${userId}`, data)
+          response = await api.put(`/admin/users/${userId}`, data, { timeout: 8000 })
           break
         case "delete":
           if (confirm("本当にこのユーザーを削除しますか？この操作は取り消せません。")) {
-            response = await api.delete(`/admin/users/${userId}`)
+            response = await api.delete(`/admin/users/${userId}`, { timeout: 8000 })
           }
           break
       }
 
       if (response) {
-        fetchUsers()
-        // Close modals
-        setShowSuspendUser(false)
-        setShowBlockUser(false)
-        setShowEditUser(false)
-        setSuspendReason("")
-        setBlockReason("")
-        setEditForm({})
+        await fetchUsers()
+        // Close modals and reset states
+        resetAllStates()
       }
     } catch (error: any) {
       console.error(`Failed to ${action} user:`, error)
-      setError(error.response?.data?.error || `Failed to ${action} user`)
+      
+      let errorMessage = `ユーザーの${action}に失敗しました`
+      
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = "リクエストがタイムアウトしました。もう一度お試しください。"
+      } else if (error.response?.status === 404) {
+        errorMessage = "ユーザーが見つかりません"
+      } else if (error.response?.status === 403) {
+        errorMessage = "権限がありません"
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      }
+      
+      setError(errorMessage)
+    } finally {
+      setTimeout(() => setIsSubmitting(false), 100)
     }
   }
 
@@ -284,8 +338,17 @@ export default function UserManagement() {
               ユーザーアカウントの管理と監視
             </p>
           </div>
-          <Button onClick={fetchUsers} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              fetchUsers()
+            }} 
+            variant="outline" 
+            size="sm"
+            disabled={loading || isSubmitting}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             更新
           </Button>
         </div>
@@ -295,6 +358,20 @@ export default function UserManagement() {
         <Alert variant="destructive" className="mb-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+          <Button 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setError(null)
+              fetchUsers()
+            }} 
+            className="mt-2"
+            size="sm"
+            disabled={loading || isSubmitting}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            再試行
+          </Button>
         </Alert>
       )}
 
@@ -405,7 +482,7 @@ export default function UserManagement() {
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.avatar} alt={user.nickname} />
+                          <AvatarImage src={user.avatar ? user.avatar : "/images/avatar/default.png"} alt={user.nickname} />
                           <AvatarFallback>{user.nickname.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
@@ -451,37 +528,51 @@ export default function UserManagement() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
                               setSelectedUser(user)
                               setShowUserDetails(true)
                             }}
+                            disabled={isSubmitting}
                           >
                             <Eye className="h-4 w-4 mr-2" />
                             詳細表示
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
                               setSelectedUser(user)
                               setEditForm(user)
                               setShowEditUser(true)
                             }}
+                            disabled={isSubmitting}
                           >
                             <Edit className="h-4 w-4 mr-2" />
                             編集
                           </DropdownMenuItem>
                           {user.isSuspended ? (
                             <DropdownMenuItem
-                              onClick={() => handleUserAction("unsuspend", user.id)}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleUserAction("unsuspend", user.id)
+                              }}
+                              disabled={isSubmitting}
                             >
                               <CheckCircle className="h-4 w-4 mr-2" />
                               停止解除
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
                                 setSelectedUser(user)
                                 setShowSuspendUser(true)
                               }}
+                              disabled={isSubmitting}
                             >
                               <Clock className="h-4 w-4 mr-2" />
                               停止
@@ -489,17 +580,25 @@ export default function UserManagement() {
                           )}
                           {user.isBlocked ? (
                             <DropdownMenuItem
-                              onClick={() => handleUserAction("unblock", user.id)}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleUserAction("unblock", user.id)
+                              }}
+                              disabled={isSubmitting}
                             >
                               <CheckCircle className="h-4 w-4 mr-2" />
                               ブロック解除
                             </DropdownMenuItem>
                           ) : (
                             <DropdownMenuItem
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
                                 setSelectedUser(user)
                                 setShowBlockUser(true)
                               }}
+                              disabled={isSubmitting}
                             >
                               <Ban className="h-4 w-4 mr-2" />
                               ブロック
@@ -507,7 +606,12 @@ export default function UserManagement() {
                           )}
                           {user.role === "USER" && (
                             <DropdownMenuItem
-                              onClick={() => handleUserAction("delete", user.id)}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleUserAction("delete", user.id)
+                              }}
+                              disabled={isSubmitting}
                               className="text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -532,16 +636,24 @@ export default function UserManagement() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCurrentPage(Math.max(1, currentPage - 1))
+                }}
+                disabled={currentPage === 1 || loading || isSubmitting}
               >
                 前へ
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setCurrentPage(Math.min(totalPages, currentPage + 1))
+                }}
+                disabled={currentPage === totalPages || loading || isSubmitting}
               >
                 次へ
               </Button>
@@ -552,7 +664,13 @@ export default function UserManagement() {
 
       {/* User Details Modal */}
       {selectedUser && (
-        <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
+        <Dialog open={showUserDetails} onOpenChange={(open) => {
+          setShowUserDetails(open)
+          if (!open) {
+            setError(null)
+            setSelectedUser(null)
+          }
+        }}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>ユーザー詳細</DialogTitle>
@@ -560,7 +678,7 @@ export default function UserManagement() {
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedUser.avatar} alt={selectedUser.nickname} />
+                  <AvatarImage src={selectedUser.avatar ? selectedUser.avatar : "/images/avatar/default.png"} alt={selectedUser.nickname} />
                   <AvatarFallback>{selectedUser.nickname.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div>
@@ -640,7 +758,16 @@ export default function UserManagement() {
 
       {/* Suspend User Modal */}
       {selectedUser && (
-        <Dialog open={showSuspendUser} onOpenChange={setShowSuspendUser}>
+        <Dialog open={showSuspendUser} onOpenChange={(open) => {
+          setShowSuspendUser(open)
+          if (!open) {
+            setError(null)
+            setIsSubmitting(false)
+            setSuspendReason("")
+            setSuspendDuration("7")
+            setIsPermanent(false)
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>ユーザー停止</DialogTitle>
@@ -679,15 +806,42 @@ export default function UserManagement() {
                   <Label htmlFor="permanent">永久停止</Label>
                 </div>
               </div>
+              
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowSuspendUser(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setShowSuspendUser(false)
+                  }}
+                  disabled={isSubmitting}
+                >
                   キャンセル
                 </Button>
                 <Button
-                  onClick={() => handleUserAction("suspend", selectedUser.id)}
-                  disabled={!suspendReason}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleUserAction("suspend", selectedUser.id)
+                  }}
+                  disabled={!suspendReason || isSubmitting}
                 >
-                  停止
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      停止中...
+                    </>
+                  ) : (
+                    '停止'
+                  )}
                 </Button>
               </div>
             </div>
@@ -697,7 +851,14 @@ export default function UserManagement() {
 
       {/* Block User Modal */}
       {selectedUser && (
-        <Dialog open={showBlockUser} onOpenChange={setShowBlockUser}>
+        <Dialog open={showBlockUser} onOpenChange={(open) => {
+          setShowBlockUser(open)
+          if (!open) {
+            setError(null)
+            setIsSubmitting(false)
+            setBlockReason("")
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>ユーザーブロック</DialogTitle>
@@ -715,16 +876,43 @@ export default function UserManagement() {
                   onChange={(e) => setBlockReason(e.target.value)}
                 />
               </div>
+              
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setShowBlockUser(false)}>
+                <Button 
+                  variant="outline" 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setShowBlockUser(false)
+                  }}
+                  disabled={isSubmitting}
+                >
                   キャンセル
                 </Button>
                 <Button
-                  onClick={() => handleUserAction("block", selectedUser.id)}
-                  disabled={!blockReason}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleUserAction("block", selectedUser.id)
+                  }}
+                  disabled={!blockReason || isSubmitting}
                   variant="destructive"
                 >
-                  ブロック
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      ブロック中...
+                    </>
+                  ) : (
+                    'ブロック'
+                  )}
                 </Button>
               </div>
             </div>
