@@ -39,10 +39,12 @@ export default function PostPage() {
         title: "入力エラー",
         description: "タイトルと内容を入力してください。",
         variant: "destructive",
+        duration: 3000,
       })
       return
     }
 
+<<<<<<< HEAD
     setIsSubmitting(true)
 
     // Simulate API call
@@ -60,6 +62,110 @@ export default function PostPage() {
       likes: 0,
       comments: 0,
       createdAt: new Date().toISOString(),
+=======
+    if (content.trim().length < 10) {
+      toast({
+        title: "入力エラー",
+        description: "内容は10文字以上で入力してください。",
+        variant: "destructive",
+        duration: 3000,
+      })
+      return
+    }
+
+    if (title.trim().length > 200) {
+      toast({
+        title: "入力エラー",
+        description: "タイトルは200文字以内で入力してください。",
+        variant: "destructive",
+        duration: 3000,
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      // Check if user has valid token
+      const token = localStorage.getItem("token")
+      if (!token) {
+        toast({
+          title: "認証エラー",
+          description: "ログイン情報が見つかりません。再度ログインしてください。",
+          variant: "destructive",
+          duration: 3000,
+        })
+        setShowLoginModal(true)
+        return
+      }
+
+      const postData = {
+        title: title.trim(),
+        content: content.trim(),
+        category: category,
+        excerpt: content.trim().substring(0, 200) + (content.trim().length > 200 ? "..." : "")
+      }
+
+      console.log("📝 Sending post data:", postData)
+      console.log("🔑 Token available:", token ? "Yes" : "No")
+      
+      const response = await api.post("/posts", postData)
+
+      console.log("✅ Post created successfully:", response.data)
+      
+      toast({
+        title: "投稿完了",
+        description: "体験記が正常に投稿されました！リアルタイムで他のユーザーに表示されます。",
+        variant: "success",
+      })
+
+      // Clear form after successful submission
+      setTitle("")
+      setContent("")
+      setCategory("初心者向け")
+      
+      // Show success message with real-time info
+      if (isConnected) {
+        toast({
+          title: "🚀 リアルタイム配信中",
+          description: "あなたの投稿が他のユーザーにリアルタイムで表示されました！",
+          variant: "success",
+        })
+      }
+      
+      // Redirect to the new post after a short delay
+      setTimeout(() => {
+        if (response.data.post?.id) {
+          router.push(`/blogs/${response.data.post.id}`)
+        }
+      }, 2000)
+    } catch (error: any) {
+      console.error("❌ Post creation error:", error)
+      console.error("Error details:", error.response?.data)
+      
+      let errorMessage = "投稿に失敗しました。もう一度お試しください。"
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.response?.data?.details) {
+        // Handle validation errors
+        const validationErrors = error.response.data.details
+        errorMessage = validationErrors.map((err: any) => err.msg).join(", ")
+      } else if (error.response?.status === 401) {
+        errorMessage = "認証エラーです。ログインし直してください。"
+      } else if (error.response?.status === 400) {
+        errorMessage = "入力データに問題があります。内容を確認してください。"
+      }
+      
+      toast({
+        title: "投稿エラー",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 3000,
+      })
+    } finally {
+      setIsSubmitting(false)
+>>>>>>> 79949e6e27ce139f4c3c834292cbe48e4ece80c4
     }
 
     posts.unshift(newPost)
@@ -98,7 +204,7 @@ export default function PostPage() {
       <div className="space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">✍️ 体験記投稿</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">体験記投稿</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
             あなたのライブチャット体験を詳しく投稿して、他のユーザーと共有しましょう。
             リアルな体験談は多くの人の参考になります。
@@ -207,6 +313,8 @@ export default function PostPage() {
                     toast({
                       title: "プレビュー機能",
                       description: "プレビュー機能は今後実装予定です。",
+                      variant: "info",
+                      duration: 3000,
                     })
                   }}
                 >
@@ -214,6 +322,22 @@ export default function PostPage() {
                   プレビュー
                 </Button>
               </div>
+<<<<<<< HEAD
+=======
+              
+              {/* Debug Info
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>Token: {typeof window !== 'undefined' && localStorage.getItem("token") ? "Available" : "Missing"}</p>
+                  <p>WebSocket: {isConnected ? "Connected" : "Disconnected"}</p>
+                  <p>Title length: {title.trim().length}/200</p>
+                  <p>Content length: {content.trim().length} (min: 10)</p>
+                  <p>Category: {category}</p>
+                  <p>User: {user?.nickname || "Not logged in"}</p>
+                </div>
+              )} */}
+>>>>>>> 79949e6e27ce139f4c3c834292cbe48e4ece80c4
             </form>
           </CardContent>
         </Card>

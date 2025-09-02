@@ -156,25 +156,39 @@ const setupSocketHandlers = (io) => {
           socket.currentRoom = null
         }
 
-        // Update user offline status
-        await prisma.roomMember.update({
+        // Check if user is a member before updating
+        const existingMember = await prisma.roomMember.findUnique({
           where: {
             roomId_userId: {
               roomId: roomId,
               userId: socket.user.id,
             },
           },
-          data: {
-            isOnline: false,
-            lastSeen: new Date(),
-          },
         })
 
-        // Notify room of user leaving
-        socket.to(roomId).emit("user-left", {
-          user: socket.user,
-          timestamp: new Date(),
-        })
+        if (existingMember) {
+          // Update user offline status
+          await prisma.roomMember.update({
+            where: {
+              roomId_userId: {
+                roomId: roomId,
+                userId: socket.user.id,
+              },
+            },
+            data: {
+              isOnline: false,
+              lastSeen: new Date(),
+            },
+          })
+
+          // Notify room of user leaving only if they were online
+          if (existingMember.isOnline) {
+            socket.to(roomId).emit("user-left", {
+              user: socket.user,
+              timestamp: new Date(),
+            })
+          }
+        }
       } catch (error) {
         console.error("Leave room error:", error)
       }

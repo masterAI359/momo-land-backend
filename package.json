@@ -11,7 +11,7 @@
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@hookform/resolvers": "^3.9.1",
-    "@prisma/client": "latest",
+    "@prisma/client": "^6.11.1",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -39,6 +39,7 @@
     "@radix-ui/react-toggle": "1.1.1",
     "@radix-ui/react-toggle-group": "1.1.1",
     "@radix-ui/react-tooltip": "1.1.6",
+    "ag-charts-react": "^12.0.2",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "latest",
     "class-variance-authority": "^0.7.1",
@@ -55,12 +56,20 @@
     "input-otp": "1.4.1",
     "jsonwebtoken": "latest",
     "lucide-react": "^0.454.0",
+<<<<<<< HEAD
     "multer": "latest",
     "next": "15.2.4",
     "next-themes": "^0.4.4",
     "node-cron": "latest",
     "path": "latest",
     "prisma": "latest",
+=======
+    "morgan": "latest",
+    "multer": "^2.0.1",
+    "next": "15.2.4",
+    "next-themes": "^0.4.4",
+    "prisma": "^6.11.1",
+>>>>>>> 79949e6e27ce139f4c3c834292cbe48e4ece80c4
     "react": "^19",
     "react-day-picker": "8.10.1",
     "react-dom": "^19",

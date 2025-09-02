@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+<<<<<<< HEAD
 import { Heart, MessageSquare, Clock, User, Trophy, Medal, Award } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
@@ -7,6 +8,35 @@ import AffiliateBanner from "@/components/affiliate-banner"
 export const metadata = {
   title: "人気ランキング - momoLand",
   description: "いいね数に基づいた人気のライブチャット体験記ランキング",
+=======
+import { Button } from "@/components/ui/button"
+import { Heart, MessageSquare, Clock, Trophy, Medal, Award, Wifi, WifiOff, RefreshCw, Eye } from "lucide-react"
+import Link from "next/link"
+import AffiliateBanner from "@/components/affiliate-banner"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth"
+import api from "@/api/axios"
+import { Skeleton } from "@/components/ui/skeleton"
+import socketService from "@/lib/socket"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+
+interface RankingPost {
+  id: string
+  title: string
+  excerpt: string
+  likesCount: number
+  commentsCount: number
+  viewCount: number
+  category: string
+  createdAt: string
+  updatedAt: string
+  author: {
+    id: string
+    nickname: string
+    avatar: string
+  }
+  rank: number
+>>>>>>> 79949e6e27ce139f4c3c834292cbe48e4ece80c4
 }
 
 export default function RankingPage() {
@@ -34,7 +64,7 @@ export default function RankingPage() {
       case 3:
         return <Award className="w-6 h-6 text-amber-600" />
       default:
-        return <span className="w-6 h-6 flex items-center justify-center text-lg font-bold text-gray-500">#{rank}</span>
+        return <span className="w-6 h-6 flex items-center justify-center text-lg font-bold text-gray-500">{rank}</span>
     }
   }
 
@@ -65,6 +95,7 @@ export default function RankingPage() {
 
         <AffiliateBanner size="large" position="content" />
 
+<<<<<<< HEAD
         {/* Top 3 Highlight */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {rankingPosts.slice(0, 3).map((post) => (
@@ -182,6 +213,114 @@ export default function RankingPage() {
             ))}
           </CardContent>
         </Card>
+=======
+        {/* Content */}
+        {loading ? (
+          <div className="space-y-6">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Card key={index} className="w-full">
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-center w-12 h-12">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                      <div className="flex items-center space-x-4">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <Skeleton className="h-8 w-16" />
+                          <Skeleton className="h-8 w-16" />
+                          <Skeleton className="h-8 w-16" />
+                        </div>
+                        <Skeleton className="h-8 w-20" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {rankingPosts.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <Trophy className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">まだランキングデータがありません</p>
+              </div>
+            ) : (
+              rankingPosts.map((post) => (
+                <Card key={post.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2 w-10 h-10 border-2 border-pink-100 bg-pink-50 rounded-full justify-center items-center">
+                          {getRankIcon(post.rank)}
+                        </div>
+                        <div>
+                          <Link href={`/blogs/${post.id}`}>
+                            <CardTitle className="text-lg hover:text-pink-600 transition-colors line-clamp-2">
+                              {post.title}
+                            </CardTitle>
+                          </Link>
+                          <CardDescription className="flex items-center space-x-4 mt-2">
+                            <span className="flex items-center space-x-1">
+                              <Avatar>
+                                <AvatarImage src={post.author.avatar ? post.author.avatar : "/images/avatar/default.png"} />
+                                <AvatarFallback>{post.author.nickname.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <span>{post.author.nickname}</span>
+                            </span>
+                            <span className="flex items-center space-x-1">
+                              <Clock className="w-4 h-4" />
+                              <span>{formatDate(post.createdAt)}</span>
+                            </span>
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="ml-4">
+                        {post.category}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                      {post.excerpt}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-6">
+                        <div className="flex items-center space-x-1 text-red-500">
+                          <Heart className="w-4 h-4" />
+                          <span className="font-semibold">{post.likesCount}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-blue-500">
+                          <MessageSquare className="w-4 h-4" />
+                          <span>{post.commentsCount}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 text-gray-500">
+                          <Eye className="w-4 h-4 text-blue-500" />
+                          <span>{post.viewCount} 回閲覧</span>
+                        </div>
+                      </div>
+                      <Link href={`/blogs/${post.id}`}>
+                        <Button variant="outline" size="sm" className="hover:bg-pink-50 hover:text-pink-600 text-sm">
+                          詳細を見る
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
+>>>>>>> 79949e6e27ce139f4c3c834292cbe48e4ece80c4
 
         <AffiliateBanner size="medium" position="content" />
 

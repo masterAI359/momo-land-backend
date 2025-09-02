@@ -9,24 +9,12 @@ router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      include: {
-        _count: {
-          select: {
-            posts: true,
-            comments: true,
-            likes: true,
-            chatRooms: true,
-          },
-        },
-      },
       select: {
-        id: true,
-        nickname: true,
-        email: true,
-        isGuest: true,
-        createdAt: true,
-        _count: true,
-      },
+        id: true, nickname: true, email: true, isGuest: true, createdAt: true,
+        _count: {
+          select: { posts: true, comments: true, likes: true, chatRooms: true }
+        }
+      }
     })
 
     if (!user) {
