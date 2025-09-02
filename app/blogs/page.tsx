@@ -6,42 +6,11 @@ import { Button } from "@/components/ui/button"
 import { MessageSquare, Heart, Clock, Wifi, WifiOff } from "lucide-react"
 import Link from "next/link"
 import AffiliateBanner from "@/components/affiliate-banner"
-import api from "@/api/axios"
-import socketService from "@/lib/socket"
 import { useAuth } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
-
-interface Post {
-  id: string
-  title: string
-  content: string
-  category: string
-  excerpt: string
-  author: {
-    id: string
-    nickname: string
-  }
-  likesCount: number
-  commentsCount: number
-  viewCount: number
-  createdAt: string
-  updatedAt: string
-}
-
-interface PostsResponse {
-  posts: Post[]
-  pagination: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-  }
-}
+import { usePosts, useApiSocket } from "@/hooks/use-api-socket"
 
 export default function BlogsPage() {
-  const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState({
     page: 1,
@@ -49,93 +18,49 @@ export default function BlogsPage() {
     total: 0,
     pages: 1
   })
-  const [isConnected, setIsConnected] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
+  
+  // Use the integrated API-socket hook
+  const { isConnected } = useApiSocket()
+  const { 
+    posts, 
+    loading, 
+    error, 
+    fetchPosts, 
+    likePost 
+  } = usePosts()
 
-  const fetchPosts = async (page: number = 1) => {
-    try {
-      setLoading(true)
-      const response = await api.get(`/posts?page=${page}&limit=10&sortBy=createdAt`)
-      const data: PostsResponse = response.data
-      
-      setPosts(data.posts)
-      setPagination(data.pagination)
+  const handleFetchPosts = async (page: number = 1) => {
+    const result = await fetchPosts({ 
+      page, 
+      limit: 10, 
+      sortBy: "createdAt" 
+    })
+    
+    if (result?.success && result.data) {
+      setPagination(result.data.pagination)
       setCurrentPage(page)
-      setError(null)
-    } catch (error: any) {
-      console.error("Failed to fetch posts:", error)
-      setError("投稿の取得に失敗しました。")
-    } finally {
-      setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchPosts(1)
-  }, [])
-
-  // Real-time WebSocket setup
-  useEffect(() => {
-    if (user) {
-      console.log("🔗 Setting up WebSocket for blogs page")
-      // Check connection status
-      setIsConnected(socketService.isConnectedToServer())
-      console.log("📡 WebSocket connected:", socketService.isConnectedToServer())
-      
-      // Join blog room for real-time updates
-      socketService.joinBlogRoom()
-
-      // Set up real-time event listeners
-      const handleNewPost = (newPost: Post) => {
-        setPosts(prevPosts => [newPost, ...prevPosts.slice(0, 9)]) // Keep only 10 posts
-        setPagination(prev => ({ ...prev, total: prev.total + 1 }))
-        
-        toast({
-          title: "新しい投稿",
-          description: `${newPost.author.nickname}さんが新しい投稿をしました: ${newPost.title}`,
-        })
-      }
-
-      const handlePostLike = (data: { postId: string; likesCount: number; isLiked: boolean }) => {
-        setPosts(prevPosts => 
-          prevPosts.map(post => 
-            post.id === data.postId 
-              ? { ...post, likesCount: data.likesCount }
-              : post
-          )
-        )
-      }
-
-      const handleNewComment = (comment: any) => {
-        setPosts(prevPosts => 
-          prevPosts.map(post => 
-            post.id === comment.postId 
-              ? { ...post, commentsCount: post.commentsCount + 1 }
-              : post
-          )
-        )
-      }
-
-      socketService.onNewPost(handleNewPost)
-      socketService.onPostLike(handlePostLike)
-      socketService.onNewComment(handleNewComment)
-
-      // Update connection status
-      const checkConnection = () => {
-        setIsConnected(socketService.isConnectedToServer())
-      }
-      const connectionInterval = setInterval(checkConnection, 5000)
-
-      return () => {
-        socketService.leaveBlogRoom()
-        socketService.offNewPost(handleNewPost)
-        socketService.offPostLike(handlePostLike)
-        socketService.offNewComment(handleNewComment)
-        clearInterval(connectionInterval)
-      }
+  const handleLikePost = async (postId: string) => {
+    if (!user) {
+      toast({
+        title: "ログインが必要です",
+        description: "いいねするにはログインしてください。",
+        variant: "destructive",
+      })
+      return
     }
-  }, [user, toast])
+
+    // The usePosts hook handles optimistic updates automatically
+    await likePost(postId)
+  }
+
+  useEffect(() => {
+    handleFetchPosts(1)
+  }, [])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -152,182 +77,290 @@ export default function BlogsPage() {
     }
   }
 
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case "初心者向け":
+        return "bg-green-100 text-green-800"
+      case "上級者向け":
+        return "bg-red-100 text-red-800"
+      case "おすすめ":
+        return "bg-blue-100 text-blue-800"
+      case "レビュー":
+        return "bg-purple-100 text-purple-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   if (loading && posts.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">投稿を読み込み中...</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">体験記一覧</h1>
+          <div className="flex items-center gap-2">
+            {isConnected ? (
+              <div className="flex items-center text-green-600">
+                <Wifi className="h-4 w-4 mr-1" />
+                <span className="text-sm">リアルタイム接続中</span>
+              </div>
+            ) : (
+              <div className="flex items-center text-red-600">
+                <WifiOff className="h-4 w-4 mr-1" />
+                <span className="text-sm">接続していません</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Loading skeleton */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded"></div>
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error && posts.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="text-center">
-          <p className="text-red-600">{error}</p>
-          <Button 
-            onClick={() => fetchPosts(currentPage)} 
-            className="mt-4"
-          >
-            再試行
-          </Button>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold text-gray-900">体験記一覧</h1>
+          <div className="flex items-center gap-2">
+            {isConnected ? (
+              <div className="flex items-center text-green-600">
+                <Wifi className="h-4 w-4 mr-1" />
+                <span className="text-sm">リアルタイム接続中</span>
+              </div>
+            ) : (
+              <div className="flex items-center text-red-600">
+                <WifiOff className="h-4 w-4 mr-1" />
+                <span className="text-sm">接続していません</span>
+              </div>
+            )}
+          </div>
         </div>
+        
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={() => handleFetchPosts(1)}>
+              再試行
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-col lg:flex-row gap-8">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">体験記一覧</h1>
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <div className="flex items-center text-green-600">
+              <Wifi className="h-4 w-4 mr-1" />
+              <span className="text-sm">リアルタイム接続中</span>
+            </div>
+          ) : (
+            <div className="flex items-center text-red-600">
+              <WifiOff className="h-4 w-4 mr-1" />
+              <span className="text-sm">接続していません</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-4">
         {/* Main Content */}
-        <div className="flex-1">
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-3xl font-bold text-gray-900">ブログ一覧</h1>
-              {user && (
-                <div className="flex items-center space-x-2">
-                  {isConnected ? (
-                    <div className="flex items-center text-green-600">
-                      <Wifi className="w-4 h-4 mr-1" />
-                      <span className="text-sm">リアルタイム接続中</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-red-600">
-                      <WifiOff className="w-4 h-4 mr-1" />
-                      <span className="text-sm">接続なし</span>
-                    </div>
-                  )}
+        <div className="lg:col-span-3">
+          {/* Affiliate Banner */}
+          <div className="mb-6">
+            <AffiliateBanner 
+              src="/images/banner/timeline_header.jpg" 
+              alt="Affiliate Banner" 
+              link="https://www.j-live.tv/loginform_ssl.php"
+              size="large"
+            />
+          </div>
+
+          {posts.length === 0 ? (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-gray-600 mb-4">まだ投稿がありません。</p>
+                <p className="text-sm text-gray-500">最初の体験記を投稿してみませんか？</p>
+                <Link href="/post">
+                  <Button className="mt-4">
+                    投稿する
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Posts Grid */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {posts.map((post) => (
+                  <Card key={post.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg line-clamp-2">
+                            <Link
+                              href={`/blogs/${post.id}`}
+                              className="hover:text-blue-600 transition-colors"
+                            >
+                              {post.title}
+                            </Link>
+                          </CardTitle>
+                          <CardDescription className="mt-2">
+                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(post.category)}`}>
+                              {post.category}
+                            </span>
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-600 line-clamp-3 mb-4">
+                        {post.excerpt}
+                      </p>
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <span>by {post.author.nickname}</span>
+                        <div className="flex items-center space-x-3">
+                          <span className="flex items-center">
+                            <Clock className="h-4 w-4 mr-1" />
+                            {formatDate(post.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-4">
+                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                          <span className="flex items-center">
+                            <MessageSquare className="h-4 w-4 mr-1" />
+                            {post.commentsCount}
+                          </span>
+                          <span>{post.viewCount} views</span>
+                        </div>
+                        <Button
+                          variant={post.isLiked ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleLikePost(post.id)}
+                          className="flex items-center space-x-1"
+                        >
+                          <Heart className={`h-4 w-4 ${post.isLiked ? 'fill-current' : ''}`} />
+                          <span>{post.likesCount}</span>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {pagination.pages > 1 && (
+                <div className="flex justify-center mt-8">
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleFetchPosts(currentPage - 1)}
+                      disabled={currentPage === 1 || loading}
+                    >
+                      前へ
+                    </Button>
+                    <span className="flex items-center px-4 py-2 text-sm">
+                      {currentPage} / {pagination.pages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleFetchPosts(currentPage + 1)}
+                      disabled={currentPage === pagination.pages || loading}
+                    >
+                      次へ
+                    </Button>
+                  </div>
                 </div>
               )}
-            </div>
-            <p className="text-gray-600">
-              ユーザーが投稿したライブチャット体験記を一覧で確認できます。
-              気になる投稿をクリックして詳細をチェックしてみましょう。
-              {user && " リアルタイムで新しい投稿や更新を受け取ります。"}
-            </p>
-          </div>
-
-          <AffiliateBanner size="large" position="content" />
-
-          {/* Blog Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {posts.map((post) => (
-              <Card key={post.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                <Link href={`/blogs/${post.id}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs bg-pink-100 text-pink-800 px-2 py-1 rounded-full">{post.category}</span>
-                      <span className="text-xs text-gray-500 flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {formatDate(post.createdAt)}
-                      </span>
-                    </div>
-                    <CardTitle className="text-lg hover:text-pink-600 transition-colors">{post.title}</CardTitle>
-                    <CardDescription>投稿者: {post.author.nickname}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600 text-sm mb-4 line-clamp-3">{post.excerpt}</p>
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <div className="flex items-center space-x-4">
-                        <span className="flex items-center">
-                          <Heart className="w-4 h-4 mr-1 text-red-500" />
-                          {post.likesCount}
-                        </span>
-                        <span className="flex items-center">
-                          <MessageSquare className="w-4 h-4 mr-1 text-blue-500" />
-                          {post.commentsCount}
-                        </span>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-pink-600 hover:text-pink-700">
-                        続きを読む →
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Link>
-              </Card>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          <div className="flex justify-center space-x-2">
-            <Button 
-              variant="outline" 
-              disabled={currentPage <= 1 || loading}
-              onClick={() => fetchPosts(currentPage - 1)}
-            >
-              前へ
-            </Button>
-            {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
-              const pageNum = i + 1
-              return (
-                <Button 
-                  key={pageNum}
-                  variant="outline" 
-                  className={currentPage === pageNum ? "bg-pink-600 text-white" : ""}
-                  onClick={() => fetchPosts(pageNum)}
-                  disabled={loading}
-                >
-                  {pageNum}
-                </Button>
-              )
-            })}
-            <Button 
-              variant="outline"
-              disabled={currentPage >= pagination.pages || loading}
-              onClick={() => fetchPosts(currentPage + 1)}
-            >
-              次へ
-            </Button>
-          </div>
+            </>
+          )}
         </div>
 
         {/* Sidebar */}
-        <div className="lg:w-80">
-          <div className="sticky top-4 space-y-6">
-            <AffiliateBanner size="small" position="sidebar" />
-
+        <div className="lg:col-span-1">
+          <div className="space-y-6">
+            {/* Popular Posts */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">人気の投稿</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {posts
-                  .slice(0, 5)
-                  .sort((a, b) => b.likesCount - a.likesCount)
-                  .map((post) => (
-                    <div key={post.id} className="border-b border-gray-100 pb-3 last:border-b-0">
-                      <Link href={`/blogs/${post.id}`} className="block hover:text-pink-600 transition-colors">
-                        <h4 className="font-medium text-sm mb-1">{post.title}</h4>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{post.author.nickname}</span>
-                          <span className="flex items-center">
-                            <Heart className="w-3 h-3 mr-1 text-red-500" />
-                            {post.likesCount}
-                          </span>
-                        </div>
-                      </Link>
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">カテゴリー</CardTitle>
-              </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {["初心者向け", "上級者向け", "おすすめ", "レビュー"].map((category) => (
-                    <Button key={category} variant="ghost" className="w-full justify-start text-sm">
-                      {category}
-                    </Button>
-                  ))}
+                <div className="space-y-3">
+                  {posts
+                    .sort((a, b) => b.likesCount - a.likesCount)
+                    .slice(0, 5)
+                    .map((post) => (
+                      <div key={post.id} className="border-l-2 border-blue-500 pl-3">
+                        <Link
+                          href={`/blogs/${post.id}`}
+                          className="text-sm font-medium hover:text-blue-600 transition-colors line-clamp-2"
+                        >
+                          {post.title}
+                        </Link>
+                        <div className="flex items-center mt-1 text-xs text-gray-500">
+                          <Heart className="h-3 w-3 mr-1" />
+                          {post.likesCount}
+                          <MessageSquare className="h-3 w-3 ml-2 mr-1" />
+                          {post.commentsCount}
+                        </div>
+                      </div>
+                    ))}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Categories */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">カテゴリ</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {["初心者向け", "上級者向け", "おすすめ", "レビュー"].map((category) => {
+                    const count = posts.filter(post => post.category === category).length
+                    return (
+                      <div key={category} className="flex justify-between items-center">
+                        <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(category)}`}>
+                          {category}
+                        </span>
+                        <span className="text-sm text-gray-500">{count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Affiliate Banner */}
+            <AffiliateBanner 
+              src="/images/banner/sidebar_banner.jpg" 
+              alt="Sidebar Banner" 
+              link="https://www.j-live.tv/LiveChat/acs.php?si=jw10000&pid=MLA5563"
+              size="small"
+            />
           </div>
         </div>
       </div>

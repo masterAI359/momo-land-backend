@@ -13,7 +13,6 @@ export default function AffiliateBanner({ size, position }: AffiliateBannerProps
   }
 
   const config = bannerConfig[size]
-
   return (
     <div className={`flex justify-center my-4 ${position === "sidebar" ? "sticky top-4" : ""}`}>
       <div className="bg-gray-100 border border-gray-200 rounded-lg p-4">

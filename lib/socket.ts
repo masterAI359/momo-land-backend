@@ -13,7 +13,7 @@ class SocketService {
       return
     }
 
-    const serverUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+    const serverUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
     console.log("Connecting to WebSocket server:", serverUrl)
     console.log("Using token:", token ? "Token provided" : "No token")
 
@@ -127,6 +127,26 @@ class SocketService {
     }
   }
 
+  onPostDelete(callback: (data: { postId: string; title: string; deletedBy: string }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up post-deleted listener")
+      this.socket.on("post-deleted", (data) => {
+        console.log("📨 Received post-deleted event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onPostViewed(callback: (data: { postId: string; viewCount: number; viewerId: string; viewerNickname: string }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up post-viewed listener")
+      this.socket.on("post-viewed", (data) => {
+        console.log("📨 Received post-viewed event:", data)
+        callback(data)
+      })
+    }
+  }
+
   onPostLike(callback: (data: { postId: string; likesCount: number; isLiked: boolean }) => void) {
     if (this.socket) {
       console.log("🎧 Setting up post-liked listener")
@@ -142,6 +162,66 @@ class SocketService {
       console.log("🎧 Setting up new-comment listener")
       this.socket.on("new-comment", (data) => {
         console.log("📨 Received new-comment event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onCommentUpdate(callback: (comment: any) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up comment-updated listener")
+      this.socket.on("comment-updated", (data) => {
+        console.log("📨 Received comment-updated event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onCommentDelete(callback: (data: { commentId: string; postId: string; deletedBy: string }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up comment-deleted listener")
+      this.socket.on("comment-deleted", (data) => {
+        console.log("📨 Received comment-deleted event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onCommentReaction(callback: (data: { commentId: string; postId: string; emoji: string; userId: string; userNickname: string }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up comment-reaction listener")
+      this.socket.on("comment-reaction", (data) => {
+        console.log("📨 Received comment-reaction event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onUserActivity(callback: (data: { postId: string; userId: string; userNickname: string; activity: string; data: any }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up user-activity listener")
+      this.socket.on("user-activity", (data) => {
+        console.log("📨 Received user-activity event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onUserViewingPost(callback: (data: { userId: string; nickname: string; postId: string }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up user-viewing-post listener")
+      this.socket.on("user-viewing-post", (data) => {
+        console.log("📨 Received user-viewing-post event:", data)
+        callback(data)
+      })
+    }
+  }
+
+  onUserLeftPost(callback: (data: { userId: string; nickname: string; postId: string }) => void) {
+    if (this.socket) {
+      console.log("🎧 Setting up user-left-post listener")
+      this.socket.on("user-left-post", (data) => {
+        console.log("📨 Received user-left-post event:", data)
         callback(data)
       })
     }
@@ -172,6 +252,18 @@ class SocketService {
     }
   }
 
+  offPostDelete(callback?: (data: { postId: string; title: string; deletedBy: string }) => void) {
+    if (this.socket) {
+      this.socket.off("post-deleted", callback)
+    }
+  }
+
+  offPostViewed(callback?: (data: { postId: string; viewCount: number; viewerId: string; viewerNickname: string }) => void) {
+    if (this.socket) {
+      this.socket.off("post-viewed", callback)
+    }
+  }
+
   offPostLike(callback?: (data: { postId: string; likesCount: number; isLiked: boolean }) => void) {
     if (this.socket) {
       this.socket.off("post-liked", callback)
@@ -181,6 +273,42 @@ class SocketService {
   offNewComment(callback?: (comment: any) => void) {
     if (this.socket) {
       this.socket.off("new-comment", callback)
+    }
+  }
+
+  offCommentUpdate(callback?: (comment: any) => void) {
+    if (this.socket) {
+      this.socket.off("comment-updated", callback)
+    }
+  }
+
+  offCommentDelete(callback?: (data: { commentId: string; postId: string; deletedBy: string }) => void) {
+    if (this.socket) {
+      this.socket.off("comment-deleted", callback)
+    }
+  }
+
+  offCommentReaction(callback?: (data: { commentId: string; postId: string; emoji: string; userId: string; userNickname: string }) => void) {
+    if (this.socket) {
+      this.socket.off("comment-reaction", callback)
+    }
+  }
+
+  offUserActivity(callback?: (data: { postId: string; userId: string; userNickname: string; activity: string; data: any }) => void) {
+    if (this.socket) {
+      this.socket.off("user-activity", callback)
+    }
+  }
+
+  offUserViewingPost(callback?: (data: { userId: string; nickname: string; postId: string }) => void) {
+    if (this.socket) {
+      this.socket.off("user-viewing-post", callback)
+    }
+  }
+
+  offUserLeftPost(callback?: (data: { userId: string; nickname: string; postId: string }) => void) {
+    if (this.socket) {
+      this.socket.off("user-left-post", callback)
     }
   }
 
@@ -493,6 +621,38 @@ class SocketService {
   offCallInitiated(callback?: (data: { roomId: string; callType: string; initiator: any }) => void) {
     if (this.socket) {
       this.socket.off("call-initiated", callback)
+    }
+  }
+
+  // Client-side activity tracking helpers
+  startReadingPost(postId: string) {
+    if (this.socket?.connected) {
+      console.log("📖 Starting to read post:", postId)
+      this.socket.emit("start-reading-post", { postId })
+    }
+  }
+
+  finishReadingPost(postId: string, readingTime: number) {
+    if (this.socket?.connected) {
+      console.log("✅ Finished reading post:", postId)
+      this.socket.emit("finish-reading-post", { postId, readingTime })
+    }
+  }
+
+  updateScrollProgress(postId: string, scrollPercentage: number, currentSection?: string) {
+    if (this.socket?.connected) {
+      this.socket.emit("post-scroll-update", { 
+        postId, 
+        scrollPercentage, 
+        currentSection 
+      })
+    }
+  }
+
+  joinAnalyticsRoom() {
+    if (this.socket?.connected) {
+      console.log("📊 Joining analytics room")
+      this.socket.emit("join-analytics-room")
     }
   }
 }

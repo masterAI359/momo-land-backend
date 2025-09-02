@@ -48,6 +48,12 @@ const setupSocketHandlers = (io) => {
     socket.on("join-blog-room", () => {
       socket.join("blog-room")
       console.log(`📢 User ${socket.user.nickname} joined blog room`)
+      
+      // Send welcome message with current blog stats
+      socket.emit("blog-room-joined", {
+        message: "Welcome to the blog room!",
+        timestamp: new Date(),
+      })
     })
 
     socket.on("leave-blog-room", () => {
@@ -58,11 +64,90 @@ const setupSocketHandlers = (io) => {
     socket.on("join-post-room", (postId) => {
       socket.join(`post-${postId}`)
       console.log(`User ${socket.user.nickname} joined post room ${postId}`)
+      
+      // Notify others that someone is viewing the post
+      socket.to(`post-${postId}`).emit("user-viewing-post", {
+        userId: socket.user.id,
+        nickname: socket.user.nickname,
+        postId: postId,
+        timestamp: new Date(),
+      })
     })
 
     socket.on("leave-post-room", (postId) => {
       socket.leave(`post-${postId}`)
       console.log(`User ${socket.user.nickname} left post room ${postId}`)
+      
+      // Notify others that user stopped viewing the post
+      socket.to(`post-${postId}`).emit("user-left-post", {
+        userId: socket.user.id,
+        nickname: socket.user.nickname,
+        postId: postId,
+        timestamp: new Date(),
+      })
+    })
+
+    // Enhanced blog post interactions
+    socket.on("start-reading-post", (data) => {
+      const { postId } = data
+      console.log(`📖 User ${socket.user.nickname} started reading post ${postId}`)
+      
+      // Track reading session
+      socket.currentReadingPost = postId
+      socket.readingStartTime = new Date()
+      
+      // Notify analytics room
+      socket.to("analytics-room").emit("reading-started", {
+        userId: socket.user.id,
+        nickname: socket.user.nickname,
+        postId: postId,
+        timestamp: socket.readingStartTime,
+      })
+    })
+
+    socket.on("finish-reading-post", (data) => {
+      const { postId, readingTime } = data
+      console.log(`✅ User ${socket.user.nickname} finished reading post ${postId}`)
+      
+      if (socket.currentReadingPost === postId && socket.readingStartTime) {
+        const actualReadingTime = Date.now() - socket.readingStartTime.getTime()
+        
+        // Notify analytics room
+        socket.to("analytics-room").emit("reading-completed", {
+          userId: socket.user.id,
+          nickname: socket.user.nickname,
+          postId: postId,
+          readingTime: actualReadingTime,
+          reportedTime: readingTime,
+          timestamp: new Date(),
+        })
+        
+        socket.currentReadingPost = null
+        socket.readingStartTime = null
+      }
+    })
+
+    socket.on("post-scroll-update", (data) => {
+      const { postId, scrollPercentage, currentSection } = data
+      
+      // Broadcast scroll progress to analytics (throttled)
+      socket.to("analytics-room").emit("scroll-progress", {
+        userId: socket.user.id,
+        nickname: socket.user.nickname,
+        postId: postId,
+        scrollPercentage: scrollPercentage,
+        currentSection: currentSection,
+        timestamp: new Date(),
+      })
+    })
+
+    // Blog analytics room
+    socket.on("join-analytics-room", () => {
+      // Only allow admin users or the system to join analytics
+      if (socket.user.role === "admin" || socket.user.isSystem) {
+        socket.join("analytics-room")
+        console.log(`📊 User ${socket.user.nickname} joined analytics room`)
+      }
     })
 
     // Join room

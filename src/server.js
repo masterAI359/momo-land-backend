@@ -8,10 +8,8 @@ const { Server } = require("socket.io")
 require("dotenv").config()
 
 const authRoutes = require("./routes/auth")
-const userRoutes = require("./routes/users")
 const postRoutes = require("./routes/posts")
 const { router: chatRoutes, setSocketIO: setChatSocketIO } = require("./routes/chat")
-const reportRoutes = require("./routes/reports")
 const { setupSocketHandlers } = require("./socket/handlers")
 const { setSocketIO } = require("./socket/socketService")
 
@@ -19,7 +17,6 @@ const app = express()
 const server = createServer(app)
 const io = new Server(server, {
   cors: {
-    // origin: process.env.FRONTEND_URL || "http://localhost:3000",
     origin: "*",
     methods: ["GET", "POST"],
   },
@@ -29,7 +26,6 @@ const io = new Server(server, {
 app.use(helmet())
 app.use(
   cors({
-    // origin: process.env.FRONTEND_URL || "http://localhost:3000",
     origin: "*",
     credentials: true,
   }),
@@ -55,10 +51,8 @@ setupSocketHandlers(io)
 
 // Routes
 app.use("/api/auth", authRoutes)
-app.use("/api/users", userRoutes)
 app.use("/api/posts", postRoutes)
 app.use("/api/chat", chatRoutes)
-app.use("/api/reports", reportRoutes)
 
 // Health check
 app.get("/api/health", (req, res) => {
@@ -101,7 +95,7 @@ app.use((req, res) => {
   })
 })
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 5000
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`)

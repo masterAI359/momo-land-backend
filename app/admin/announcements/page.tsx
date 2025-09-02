@@ -377,12 +377,6 @@ export default function AnnouncementsAdminPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Link href="/demo-realtime">
-                  <Button variant="outline" className="w-full justify-start">
-                    <Bell className="h-4 w-4 mr-2" />
-                    リアルタイムデモ
-                  </Button>
-                </Link>
                 <Link href="/chat">
                   <Button variant="outline" className="w-full justify-start">
                     <Users className="h-4 w-4 mr-2" />

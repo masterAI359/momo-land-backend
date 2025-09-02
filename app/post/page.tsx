@@ -13,8 +13,8 @@ import { useAuth } from "@/lib/auth"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import LoginModal from "@/components/login-modal"
-import api from "@/api/axios"
-import socketService from "@/lib/socket"
+import { useApiSocket } from "@/hooks/use-api-socket"
+import apiSocketService from "@/lib/api-socket"
 
 export default function PostPage() {
   const [title, setTitle] = useState("")
@@ -22,24 +22,12 @@ export default function PostPage() {
   const [category, setCategory] = useState("初心者向け")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
+  const { isConnected } = useApiSocket()
 
   const categories = ["初心者向け", "上級者向け", "おすすめ", "レビュー"]
-
-  // Check WebSocket connection status
-  useEffect(() => {
-    if (user) {
-      setIsConnected(socketService.isConnectedToServer())
-      const checkConnection = () => {
-        setIsConnected(socketService.isConnectedToServer())
-      }
-      const connectionInterval = setInterval(checkConnection, 5000)
-      return () => clearInterval(connectionInterval)
-    }
-  }, [user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,31 +49,39 @@ export default function PostPage() {
     setIsSubmitting(true)
 
     try {
-      const response = await api.post("/posts", {
+      const result = await apiSocketService.createPost({
         title: title.trim(),
         content: content.trim(),
         category,
       })
 
-      console.log("response =================", response)
-      
-      toast({
-        title: "投稿完了",
-        description: "体験記が正常に投稿されました！",
-      })
+      if (result.success) {
+        toast({
+          title: "投稿完了",
+          description: "体験記が正常に投稿されました！",
+        })
 
-      // Clear form after successful submission
-      setTitle("")
-      setContent("")
-      setCategory("初心者向け")
-      
-      // Optionally redirect to the new post
-      // router.push(`/blogs/${response.data.post.id}`)
+        // Clear form after successful submission
+        setTitle("")
+        setContent("")
+        setCategory("初心者向け")
+        
+        // Optionally redirect to the new post
+        if (result.data) {
+          router.push(`/blogs/${result.data.id}`)
+        }
+      } else {
+        toast({
+          title: "投稿エラー",
+          description: result.error || "投稿に失敗しました。もう一度お試しください。",
+          variant: "destructive",
+        })
+      }
     } catch (error: any) {
       console.error("Post creation error:", error)
       toast({
         title: "投稿エラー",
-        description: error.response?.data?.error || "投稿に失敗しました。もう一度お試しください。",
+        description: "投稿に失敗しました。もう一度お試しください。",
         variant: "destructive",
       })
     } finally {

@@ -51,8 +51,8 @@ export default function RankingPage() {
       
       // Try with explicit URL construction to avoid baseURL issues
       const baseURL = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:3001/api' 
-        : (process.env.SERVER_URL || 'http://localhost:3001/api')
+        ? 'http://localhost:5000/api' 
+        : (process.env.SERVER_URL || 'http://localhost:5000/api')
       
       const response = await api.get("/posts/ranking", {
         timeout: 10000, // 10 second timeout

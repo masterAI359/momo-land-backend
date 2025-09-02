@@ -483,16 +483,10 @@ export default function GroupChatPage() {
       {/* Quick Actions */}
       <div className="mt-8 text-center">
         <div className="flex justify-center gap-4">
-          <Link href="/demo-realtime">
+          <Link href="/chat/create">
             <Button variant="outline">
-              <Activity className="h-4 w-4 mr-2" />
-              リアルタイム機能のデモ
-            </Button>
-          </Link>
-          <Link href="/admin-announcements">
-            <Button variant="outline">
-              <Megaphone className="h-4 w-4 mr-2" />
-              システムアナウンス管理
+              <Plus className="h-4 w-4 mr-2" />
+              新しいチャットルーム作成
             </Button>
           </Link>
         </div>
